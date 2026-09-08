@@ -116,19 +116,23 @@ class KnowledgeCLITests(unittest.TestCase):
         self.assertFalse(self.state.exists())
         self.assertFalse((self.project / '.shared-memory.json').exists())
 
-    @unittest.skipUnless(os.name == 'nt', 'Windows NTFS junction fixture')
-    def test_actual_windows_junction_root_and_ancestor_rejected_before_local_or_accepted_reads(self):
+    def test_linked_root_and_ancestor_rejected_before_local_or_accepted_reads(self):
         outside = self.root / 'private-outside'; outside.mkdir()
         (outside / 'nested').mkdir()
         private = outside / 'nested' / 'Private.md'
         private.write_bytes(b'# PRIVATE-JUNCTION-TARGET\n')
         before = fingerprint(outside)
         link = self.project / 'linked'
-        created = subprocess.run(['cmd', '/d', '/c', 'mklink', '/J', str(link), str(outside)],
-                                 capture_output=True, text=True, timeout=15)
-        self.assertEqual(created.returncode, 0, created.stdout + created.stderr)
-        self.addCleanup(lambda: os.rmdir(link) if link.exists() else None)
-        for selected in (link, link / 'nested'):
+        if os.name == 'nt':
+            created = subprocess.run(['cmd', '/d', '/c', 'mklink', '/J', str(link), str(outside)],
+                                     capture_output=True, text=True, timeout=15)
+            self.assertEqual(created.returncode, 0, created.stdout + created.stderr)
+            self.assertFalse(link.is_symlink(), 'Exercise an actual non-symlink Windows junction')
+            self.addCleanup(lambda: os.rmdir(link) if link.exists() else None)
+        else:
+            link.symlink_to(outside, target_is_directory=True)
+            self.addCleanup(lambda: link.unlink() if link.is_symlink() else None)
+        for selected in (link, link / 'nested', link / '..'):
             for accepted in (False, True):
                 with self.subTest(root=selected.name, accepted=accepted):
                     command = [sys.executable, str(self.archive), 'graph', str(selected)]

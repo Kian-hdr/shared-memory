@@ -18,9 +18,16 @@ def add_commands(commands):
 
 def dispatch(bundle, args):
     from .knowledge import analyze, _absolute
-    root = selected_root(args.project)
-    # Validate original roots/ancestors before reading notes or private bindings;
-    # selected_root resolves junctions and could otherwise hide the link.
+    try:
+        root = selected_root(args.project)
+    except ProductError as exc:
+        if exc.code == 'project_path_unsafe':
+            # Keep the graph command's established error contract when the shared
+            # root guard rejects before graph-specific validation can run.
+            raise ProductError(3, 'knowledge_root',
+                               'The selected graph root cannot use symlinks or reparse points.') from exc
+        raise
+    # Retain graph-specific validation before notes or private bindings are read.
     _absolute(Path(args.project).expanduser())
     if not args.accepted:
         if args.state_dir:

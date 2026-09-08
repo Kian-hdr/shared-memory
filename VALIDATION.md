@@ -10,6 +10,31 @@ Historical links below identify runs in the legacy repository and may require ac
 after it becomes private. They are not new-repository CI results. The new repository
 checkpoint below records its own completed validation separately.
 
+## Graph error-contract compatibility, 2026-09-08
+
+The core path correction at `9a150a3` passed ten [matrix jobs](https://github.com/Kian-hdr/shared-memory/actions/runs/34245369088).
+Both Windows product jobs passed the new junction and rename regressions but failed
+four subcases of one existing graph CLI test: the earlier shared root guard emitted
+`project_path_unsafe` instead of the graph command's established `knowledge_root`.
+The unsafe path was rejected before reads; this was an error-contract regression.
+Each Windows job collected 345 tests, with four skips and one failing test method
+containing four failed subcases. The candidate remains withheld.
+
+The graph entrypoint now translates only that specific shared path error into its
+existing graph code, while retaining all guards and other errors. The packaged
+regression uses actual POSIX symlinks or Windows junctions for roots, ancestors and
+`alias/..`, in both local and accepted modes, before private-state access. All nine
+graph CLI tests passed on local Python 3.13 and 3.12. Independent review approved
+the bounded correction. Exact corrected Windows execution is still required.
+
+The same `9a150a3` [HTTPS trial](https://github.com/Kian-hdr/shared-memory/actions/runs/34245368476)
+passed all four jobs and 406 calls/four expected refusals. All three OS clients
+matched accepted revision 5 and content hash, preserved private bytes and stopped
+temporary processes. The subsequent correction changes only graph error reporting
+and its regression, not the transport/client/authority code exercised by that trial.
+Real storage-provider delivery, independent people and operational deployment remain
+separate open gates.
+
 ## Selected-root and core path-boundary correction, 2026-09-08
 
 The `24f1ff3` candidate is withheld. Its [matrix](https://github.com/Kian-hdr/shared-memory/actions/runs/34243071900)
