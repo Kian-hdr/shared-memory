@@ -231,9 +231,11 @@ Validate actual graph/navigation behavior in an isolated Obsidian fixture before
 claiming UI compatibility. YAML/link checks alone are insufficient. This does not
 require a new production vault or authorize migration of the live Vault. A bounded
 read-only graph analyser was the first implementation step. The isolated native
-Obsidian graph/navigation check has separate captured evidence. Safe scoped
-rename/move remains an implementation gate: the native rename also updated an
-outer-fixture backlink and therefore did not establish GRAPH-02 isolation.
+Obsidian graph/navigation check has separate captured evidence. The earlier native
+rename also updated an outer-fixture backlink and did not establish GRAPH-02
+isolation. The reviewed product rename now has separate local proposal/apply,
+interruption/recovery and native-link evidence; cross-OS validation of that new
+implementation is tracked separately. Unsupported syntax is explicitly refused.
 
 | Extension gate | Required observable result |
 | --- | --- |

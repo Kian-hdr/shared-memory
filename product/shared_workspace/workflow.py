@@ -484,7 +484,7 @@ def _setup(root, state, args):
 
 
 def dispatch(bundle, args):
-    from .client import Client
+    from .client import Client, _draft_coordination
     from .engine import Coordinator
     if args.command == "providers":
         return {"providers": [capabilities(p, args.account_type) for p in ([args.provider] if args.provider else PROVIDERS)]}
@@ -526,11 +526,11 @@ def dispatch(bundle, args):
         return client.refresh()
     if args.command == "draft":
         return client.draft(args.proposal_id, args.assignment_id, args.evidence, json_file(args.claims_file) if args.claims_file else None,
-                            coordination=json_file(args.coordination_file) if args.coordination_file is not None else None)
+                            coordination=_draft_coordination(json_file(args.coordination_file)) if args.coordination_file is not None else None)
     if args.command == "promote-draft":
         return client.promote_preserved(args.preserved_id, args.proposal_id, args.assignment_id, args.evidence,
                                        json_file(args.claims_file) if args.claims_file else None,
-                                       coordination=json_file(args.coordination_file) if args.coordination_file is not None else None)
+                                       coordination=_draft_coordination(json_file(args.coordination_file)) if args.coordination_file is not None else None)
     if args.command == "submit":
         return client.submit(args.proposal_id)
     if args.command == "team-status":

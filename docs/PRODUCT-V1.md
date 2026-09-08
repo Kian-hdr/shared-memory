@@ -294,6 +294,16 @@ nodes, links, backlinks and explicit diagnostics; neither grants policy authorit
 See [the knowledge graph guide](KNOWLEDGE-GRAPH.md) for supported Markdown, privacy
 bounds and the separate native Obsidian rename/navigation validation.
 
+For a reviewed move of one selected Markdown note, `graph-rename-plan` records
+exact original bytes, hashes and affected links in private state; `graph-rename-draft`
+saves an ordinary assignment proposal without editing notes. Submit and accept it
+through the same authenticated ownership/integration rules as other work, then use
+`graph-rename-apply` to materialize only when the accepted snapshot exactly matches
+the plan. Originals and interrupted writes use the existing private backup/journal.
+Unsupported or ambiguous links and stale plans are refused. Parent-vault backlinks
+remain unknown and untouched; filesystem writes are recoverable, not one atomic
+multi-file rename. See the knowledge graph guide for exact arguments and limits.
+
 ## Legacy schema-1 daily agent workflow
 
 1. Run `refresh PROJECT --state-dir STATE`, then `team-status` and `context --query

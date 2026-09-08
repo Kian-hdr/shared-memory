@@ -16,6 +16,7 @@ from . import maintenance
 from . import delivery_workflow
 from . import knowledge_workflow
 from . import coordination_workflow
+from . import graph_rename
 
 COMMANDS = ("version", "guide", "capabilities", "create", "join", "doctor", "status", "work", "teammate-prompt")
 
@@ -56,12 +57,13 @@ def parser() -> argparse.ArgumentParser:
     delivery_workflow.add_commands(commands)
     knowledge_workflow.add_commands(commands)
     coordination_workflow.add_commands(commands)
+    graph_rename.add_commands(commands)
     return result
 
 
 def capabilities() -> dict:
     return {
-        "commands": list(COMMANDS) + list(workflow.TEAM_COMMANDS) + list(maintenance.COMMANDS) + list(delivery_workflow.COMMANDS) + list(knowledge_workflow.COMMANDS) + list(coordination_workflow.COMMANDS),
+        "commands": list(COMMANDS) + list(workflow.TEAM_COMMANDS) + list(maintenance.COMMANDS) + list(delivery_workflow.COMMANDS) + list(knowledge_workflow.COMMANDS) + list(coordination_workflow.COMMANDS) + list(graph_rename.COMMANDS),
         "implemented": {"selected_folder_setup": True, "portable_project_identity": True,
                         "trusted_bundle_execution": True, "json_output": True,
                         "advisory_claims_handoffs_and_evidence": True,
@@ -76,6 +78,9 @@ def capabilities() -> dict:
                             "sources": ["local_selected_folder", "accepted_coordinator_snapshot"],
                             "parent_vault_reads": False, "policy_authority": False,
                             "native_rename_command": False},
+        "reviewed_note_rename": {"commands": list(graph_rename.COMMANDS), "acceptance_required": True,
+                                "scope": "selected_folder_markdown", "outer_backlinks": "unknown",
+                                "recovery": "private_client_journal", "filesystem_atomicity": False},
         "explicit_delivery": {"commands": list(delivery_workflow.COMMANDS),
                               "routes": ["local_fixture", "google_drive_rclone"],
                               "initial_join": "coordinator_attach_required",
@@ -130,7 +135,9 @@ def main(argv=None) -> int:
             if hasattr(args, name) and not getattr(args, name).strip():
                 raise ProductError(2, "usage_error", f"--{name} cannot be empty.")
         with open_bundle(args.bundle) as bundle:
-            if command in coordination_workflow.COMMANDS:
+            if command in graph_rename.COMMANDS:
+                data = graph_rename.dispatch(bundle, args)
+            elif command in coordination_workflow.COMMANDS:
                 data = coordination_workflow.dispatch(bundle, args)
             elif command in knowledge_workflow.COMMANDS:
                 data = knowledge_workflow.dispatch(bundle, args)

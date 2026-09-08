@@ -55,3 +55,5 @@ jobs:
         run: python "${{ runner.temp }}/shared-memory.pyz" guide
       - name: Rehearse scoped sessions and recipient handoff
         run: python scripts/rehearse_coordination.py --package "${{ runner.temp }}/shared-memory.pyz" --output "${{ runner.temp }}/coordination-rehearsal"
+      - name: Rehearse reviewed selected-folder rename
+        run: python scripts/rehearse_graph_rename.py --package "${{ runner.temp }}/shared-memory.pyz" --output "${{ runner.temp }}/graph-rename-rehearsal"

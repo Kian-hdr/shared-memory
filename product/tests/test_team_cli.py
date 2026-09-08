@@ -265,6 +265,39 @@ class TeamCLITests(unittest.TestCase):
         self.assertEqual(file_bytes(self.root), before)
         self.assertFalse(private.exists())
 
+    def malformed_draft_context(self, command):
+        self.initialize()
+        (self.project / 'Home.md').write_bytes(b'Preserved fixture edit\r\n')
+        preserved = self.cli('refresh')['drafts'][0]
+        (self.project / 'Home.md').write_bytes(b'Fresh fixture draft\n')
+        context_file = self.root / 'context.json'
+        extra = ['--preserved-id', preserved] if command == 'promote-draft' else []
+        values = (None, [], 'context', 1, {}, {'policy_revision': 1})
+        for value in values:
+            with self.subTest(command=command, context=value):
+                context_file.write_bytes(json.dumps(value).encode())
+                before = file_bytes(self.root)
+                inventory = sorted(str(p.relative_to(self.root)) for p in self.root.rglob('*'))
+                self.cli(command, None, None, '--proposal-id', 'invalid-context', '--assignment-id', 'work',
+                    '--evidence', 'Reviewed disposable fixture', '--coordination-file', context_file, *extra, expected=3)
+                self.assertEqual(file_bytes(self.root), before)
+                self.assertEqual(sorted(str(p.relative_to(self.root)) for p in self.root.rglob('*')), inventory)
+        # Omitted context still preserves the explicit legacy API behavior.
+        omitted = self.cli(command, None, None, '--proposal-id', 'omitted-context', '--assignment-id', 'work',
+            '--evidence', 'Reviewed disposable legacy fixture', *extra)
+        self.assertNotIn('coordination', omitted)
+        valid_context = {'session_id': 'fixture-session', 'generation': 1, 'policy_revision': 1, 'input_hash': 'a' * 64}
+        context_file.write_bytes(json.dumps(valid_context).encode())
+        supplied = self.cli(command, None, None, '--proposal-id', 'valid-context', '--assignment-id', 'work',
+            '--evidence', 'Reviewed explicit fixture context', '--coordination-file', context_file, *extra)
+        self.assertEqual(supplied['coordination'], valid_context)
+
+    def test_draft_explicit_null_and_malformed_context_rejected_without_writes(self):
+        self.malformed_draft_context('draft')
+
+    def test_promote_draft_explicit_null_and_malformed_context_rejected_without_writes(self):
+        self.malformed_draft_context('promote-draft')
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

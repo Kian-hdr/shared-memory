@@ -10,6 +10,34 @@ Historical links below identify runs in the legacy repository and may require ac
 after it becomes private. They are not new-repository CI results. The new repository
 checkpoint below records its own completed validation separately.
 
+## Scoped product rename and context validation, 2026-09-08
+
+The new graph rename plan/draft/apply workflow preserves selected-folder boundaries
+and uses ordinary authenticated proposals plus the existing client journal/backups.
+The independent review reproduced a supplied JSON-null coordination file being
+silently treated as omitted; rename, ordinary draft and preserved-draft promotion
+now validate supplied objects before mutation. Packaged regressions cover malformed
+shapes, valid context and actual omission. Independent probes confirm that a new
+local edit after acceptance remains preserved and yields a correctly partial receipt.
+
+The final local Python 3.13 suite collected **299 tests: 296 passed and three
+Windows-only junction tests skipped**, in 76.122 seconds. The focused rename/client/
+graph suite passed 87 of 90 with three platform skips on both 3.13 and 3.12;
+following generic context fixes, all ten team CLI cases passed on both, with the
+two new malformed-context cases independently rerun. Actual Windows execution and
+the new 20-command packaged rename fixture are included in the pending matrix.
+
+A separate fixture ran the actual packaged schema-2 rename inside an existing
+registered Obsidian test vault, with private runtime state outside it. All 20 calls
+passed, including two expected refusals, at revision 1/hash
+`840c483d4f03c3bef38bc1450ce2789a33b7759d01b8ba1bd0bcf33afd3f98af`.
+Obsidian **1.13.7 (installer 1.12.7)** resolved all six selected links; clicking the
+rendered wikilink opened the renamed note and the native backlink pane showed the
+three incoming Home references. Existing notes, known outer backlinks and app
+configuration were preserved; only workspace layout changed. This proof used an
+explicitly labeled development package; clean committed package identity/readback
+is a separate checkpoint. It does not establish provider or independent-user readiness.
+
 ## Windows portability correction, 2026-09-08
 
 The extension at `3c8e9e90e78e4b12890e13c1dd42a03a863ecab5` passed ten
@@ -60,9 +88,15 @@ passed: schema 1 made 96 packaged calls/two expected refusals at revision 3;
 schema 2 made 309 calls/four refusals at revision 5 with content hash
 `34bbe57a2286cd4d98343d8fadf73cc74ac7e783f1ef3ece48535722cd0da764`.
 Call counts include polling, not distinct coverage. All four processes stopped.
-Independent review inspected the frozen script and both complete reports. Actual
-remote OS execution of this extension is a separate pending check. Neither local
-role names nor automated runners constitute independent people/provider TEAM-11.
+Independent review inspected the frozen script and both complete reports. The actual
+[three-OS HTTPS run](https://github.com/Kian-hdr/shared-memory/actions/runs/34241487058)
+at private checkpoint `912ae9f94a050e382fa80fbffa76ae2049242331` then passed all
+four jobs, with 396 packaged calls/four expected refusals, the same revision-5 hash
+and preserved private fixture bytes. Each actual OS client used its own session;
+temporary coordinator/tunnel processes stopped. Its package SHA-256
+`5c2946d3513e6c1b07774d327830e5b1cc27557b582d6084407171051e2d1fab` matches
+the independently built/read-back clean source package. Neither local role names
+nor automated runners constitute independent people/provider TEAM-11.
 
 The new inbox-resume acceptance test starts separate consumer processes against
 the actual SQLite authority, persists a two-message-page cursor, resumes after new

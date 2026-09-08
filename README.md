@@ -38,6 +38,10 @@ The legacy tracker uses advisory file claims. The development engine adds
 authoritative proposal acceptance and recoverable file materialization. Neither
 controls external editors or configures a provider’s sharing permissions.
 
+Reviewed selected-folder note moves now use a private plan, an authenticated
+proposal and recoverable application of accepted bytes. See the
+[rename procedure and scope limits](docs/KNOWLEDGE-GRAPH.md).
+
 ## Authoritative product development build
 
 The [Shared Memory operating guide](docs/PRODUCT-V1.md) describes the **0.2.0
