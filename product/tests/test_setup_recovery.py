@@ -185,11 +185,17 @@ class SetupRecoveryTests(unittest.TestCase):
                 self.assert_private(project, state)
 
     def test_attach_hard_exit_boundaries_resume_same_membership_and_preserve_edits(self):
+        if str(REPO / 'product') not in sys.path:
+            sys.path.insert(0, str(REPO / 'product'))
+        from shared_workspace.transport import read_token
         owner, owner_state = self.fixture('owner')
         initialized = self.run_cli(self.init_args(owner, owner_state))['data']
         incoming = self.root / 'recipient.token'
         self.run_cli(['member-add', str(owner), '--state-dir', str(owner_state), '--actor', 'recipient',
                       '--person', 'Fixture Recipient', '--agent', 'Test', '--token-output', str(incoming)])
+        # External token files may use native Windows CRLF. Credential syntax
+        # normalizes the terminator; accepted project text must remain byte exact.
+        incoming.write_bytes(read_token(incoming).encode('utf-8') + b'\r\n')
         original_snapshot = self.coordinator(owner, owner_state, 'snapshot')
         for boundary in ('before-intent', 'after-intent', 'after-credential', 'after-project-write', 'before-manifest', 'after-manifest'):
             with self.subTest(boundary=boundary):
@@ -199,12 +205,19 @@ class SetupRecoveryTests(unittest.TestCase):
                 self.crash(boundary, args)
                 intent_path = state / 'setup-intent.json'
                 original_intent = intent_path.read_bytes() if intent_path.exists() else None
+                token_path = state / 'member.token'
+                prior_private_bytes = token_path.read_bytes() if token_path.exists() else None
                 if original_intent:
                     (project / 'Home.md').write_bytes(b'RECIPIENT-POST-CRASH-EDIT\n')
                 finished = self.run_cli(args)['data']
                 self.assertEqual(finished['receipt']['readiness'], 'ready')
                 self.assertEqual(finished['receipt']['project_id'], initialized['project_id'])
-                self.assertEqual((state / 'member.token').read_bytes(), incoming.read_bytes())
+                self.assertTrue(read_token(token_path) == read_token(incoming), 'Joining membership credential changed')
+                if prior_private_bytes is not None:
+                    self.assertTrue(token_path.read_bytes() == prior_private_bytes, 'Retry replaced private credential bytes')
+                completed_private_bytes = token_path.read_bytes()
+                self.run_cli(args)
+                self.assertTrue(token_path.read_bytes() == completed_private_bytes, 'Completed retry replaced private credential bytes')
                 if original_intent:
                     self.assertEqual(intent_path.read_bytes(), original_intent)
                     self.assertTrue(any(b'RECIPIENT-POST-CRASH-EDIT' in p.read_bytes()
@@ -220,6 +233,27 @@ class SetupRecoveryTests(unittest.TestCase):
         self.assertEqual(result['receipt']['readiness'], 'ready')
         self.assertEqual((project / 'Home.md').read_bytes(), content)
         self.assertEqual(self.coordinator(project, state, 'snapshot')['files']['Home.md'].encode('utf-8'), content)
+
+    def test_packaged_json_unicode_under_cp1252_without_utf8_mode(self):
+        project, state = self.fixture('legacy-output-encoding')
+        content = '# Unicode Δ 世界 🚀\r\nMixed β\nLast γ\rno final newline'
+        (project / 'Home.md').write_bytes(content.encode('utf-8'))
+        environment = dict(os.environ, PYTHONIOENCODING='cp1252', PYTHONUTF8='0')
+        commands = [self.init_args(project, state), ['coord', str(project), '--state-dir', str(state), 'snapshot']]
+        responses = []
+        for arguments in commands:
+            result = subprocess.run([sys.executable, str(self.package), *arguments], cwd=REPO, env=environment,
+                                    capture_output=True, timeout=30)
+            self.assertEqual(result.returncode, 0, result.stdout.decode('ascii', errors='backslashreplace') + result.stderr.decode('ascii', errors='backslashreplace'))
+            # Machine JSON is ASCII-safe on legacy pipes; JSON decoding still
+            # returns every original Unicode character and line-ending byte.
+            rendered = result.stdout.decode('ascii')
+            self.assertEqual(len(rendered.splitlines()), 1)
+            response = json.loads(rendered)
+            self.assertTrue(response['ok'])
+            responses.append(response)
+        self.assertEqual(responses[1]['data']['files']['Home.md'], content)
+        self.assertEqual((project / 'Home.md').read_bytes(), content.encode('utf-8'))
 
     def test_changed_owner_provider_root_and_credentials_never_take_over_pending_state(self):
         project, state = self.fixture('binding')

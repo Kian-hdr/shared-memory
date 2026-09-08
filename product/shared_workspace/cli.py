@@ -94,7 +94,9 @@ def emit(command, *, ok, code, data=None, warnings=None, message=None):
               "ok": ok, "code": code, "data": data or {}, "warnings": warnings or []}
     if message is not None:
         result["message"] = message
-    print(json.dumps(result, ensure_ascii=False))
+    # ASCII-safe JSON works on legacy console/pipe encodings without changing
+    # decoded Unicode values or requiring the caller to force UTF-8 mode.
+    print(json.dumps(result, ensure_ascii=True))
 
 
 def main(argv=None) -> int:

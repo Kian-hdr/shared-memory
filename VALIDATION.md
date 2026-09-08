@@ -1,5 +1,26 @@
 # Validation record
 
+## Windows output correction, 2026-09-08
+
+The corrected recovery source at `8c5c26ef6167dc3efb256ef798fb3744777af044`
+passed the [four-job HTTPS run](https://github.com/Kian-hdr/shared-obsidian-workspace/actions/runs/34180503539)
+with 104 packaged calls, including exact existing mixed-line-ending and non-ASCII
+content on all three OS clients. Its [full CI matrix](https://github.com/Kian-hdr/shared-obsidian-workspace/actions/runs/34180503531)
+passed ten jobs; both Windows product jobs exposed a real CLI output encoding bug
+and a token-terminator assertion mistake. The downloadable candidate remained withheld.
+
+Valid Unicode content could fail JSON output under a legacy Windows CP1252 pipe and
+be mislabeled malformed project data. The CLI now emits ASCII-safe JSON escapes;
+decoded Unicode values and UTF8 project bytes are unchanged. A real packaged-process
+regression forces `PYTHONIOENCODING=cp1252` and `PYTHONUTF8=0`, and passed after failing
+before the fix. Credential tests now deliberately use CRLF input, compare the parsed
+credential value, and still require private credential bytes to remain unchanged
+through interrupted and completed retries.
+
+**132/132 product tests passed on macOS/Python 3.13.15 and 3.12.13, no skips.**
+Fresh actual Windows/macOS/Linux CI and the HTTPS run on this committed output fix
+remain the next release check. The earlier successful run does not substitute for it.
+
 ## Recovery hardening checkpoint, 2026-09-08
 
 A subsequent bounded audit reproduced interrupted first-time setup, a skipped-revision
@@ -28,9 +49,9 @@ reproduced the original failures and verified the corrections. These boundaries 
 not certify physical power loss or every filesystem. Setup, installation and directory
 conversion require supported same-filesystem hard links.
 
-The next step is fresh cross-platform CI and the concurrent HTTPS run on the committed
-corrected source. No corrected-package remote pass or downloadable release is implied
-until those runs complete.
+The subsequent remote result and Windows output correction are recorded above.
+This section preserves the earlier local 131-case checkpoint; it is not the final
+release result.
 
 ## Published development branch and cross-platform CI, 2026-09-08
 
