@@ -41,6 +41,14 @@ provider choice does not grant access or deploy one. Discover the chosen provide
 actual client/folder or supported route. Keep provider access and coordinator
 membership separate; never copy the sender's identity or device-local paths.
 
+If explicit revision delivery is selected, follow this package's operating guide
+for delivery-publish/delivery-fetch with a reviewed private rclone binding. Initial
+attach still uses coordinator bytes. Prove subsequent provider delivery before any
+normal refresh: download from that route, verify accepted identity/hash, then apply
+through the client journal. Do not substitute coordinator content when delivery
+fails. A local rclone fixture is only local evidence. The development Drive adapter
+does not establish live account or mixed-device acceptance and never configures access.
+
 For a new owner project, initialize only the selected folder with my distinct human,
 agent and actor identity. Preserve existing home/instructions and unrelated artifacts.
 For joining, use my independently issued private token, the expected project ID and

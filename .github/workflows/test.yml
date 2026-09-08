@@ -46,6 +46,8 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python }}
+      - name: Stage hash-pinned rclone for local delivery fixtures
+        run: python scripts/prepare_rclone_fixture.py --output "${{ runner.temp }}/rclone-fixture" --github-path
       - run: python -m unittest discover -s product/tests -v
       - name: Build exact product candidate
         run: python scripts/build_product.py --output "${{ runner.temp }}/shared-memory.pyz"

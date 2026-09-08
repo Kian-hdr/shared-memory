@@ -238,6 +238,75 @@ tracked/untracked bytes and disabling checkout hooks for this operation. Worktre
 start from a commit and omit uncommitted changes. Coordinator assignment and code
 integration are separate. Keep repositories/worktrees outside consumer sync folders.
 
+## Explicit revision delivery, development scope
+
+`delivery-publish` and `delivery-fetch` transfer accepted text revisions through an
+explicit installed rclone driver. This first adapter supports already attached
+projects. Initial `attach` still obtains its initial snapshot from the coordinator;
+it is not evidence of provider delivery. Obsidian is optional throughout.
+
+For a local transfer rehearsal, use an existing disposable directory separate from
+both the selected project and private state. This exercises the actual rclone local
+backend and always reports `local_fixture`, never a Google Drive receipt:
+
+```text
+python PACKAGE.pyz delivery-publish PROJECT --state-dir PRIVATE_STATE --rclone ABSOLUTE_RCLONE_EXECUTABLE --fixture-root DISPOSABLE_LOCAL_TRANSFER
+python PACKAGE.pyz delivery-fetch PROJECT --state-dir RECIPIENT_PRIVATE_STATE --rclone ABSOLUTE_RCLONE_EXECUTABLE --fixture-root DISPOSABLE_LOCAL_TRANSFER
+```
+
+The Google Drive route requires the project to have been explicitly initialized or
+attached with `--provider google-drive`, and an already authorized private rclone
+config plus reviewed folder/account binding. The command never signs in, invites
+people, changes permissions, or configures an account. Keep both config and binding
+outside the shared project and sync storage. On POSIX they must be owned by the
+current user with no group/other access. Review equivalent private access on Windows.
+Example binding shape, with recipient-specific placeholders:
+
+```json
+{
+  "config": "ABSOLUTE_PRIVATE_CONFIG_PATH",
+  "remote": "REVIEWED_NAMED_REMOTE",
+  "root_folder_id": "REVIEWED_FOLDER_ID",
+  "account_type": "workspace_my_drive",
+  "reviewed": true
+}
+```
+
+Account types are `personal`, `workspace_my_drive`, or `workspace_shared_drive`;
+the last also requires `team_drive_id`. Use `--binding-file PRIVATE_BINDING_JSON`
+instead of `--fixture-root` in either command. These IDs and config contents belong
+only in private local configuration, not in shared notes or reports. A root folder
+bounds this adapter's operations; it does not narrow an OAuth token's authority.
+See [rclone's Drive setup and scope requirements](https://rclone.org/drive/) and
+[Google's API scope guidance](https://developers.google.com/workspace/drive/api/guides/api-specific-auth).
+
+Publication uses `PROJECT_UUID/revisions/REVISION-HASH/` with exact UTF-8 bytes and
+a final manifest completion marker. Matching retries are idempotent. Conflicting,
+extra, duplicate, unsafe or incomplete content fails validation; it is not repaired
+by overwriting history. Native Google documents and shortcuts are unsupported. This
+is not a Drive transaction or multi-writer compare-and-swap protocol. Assign one
+approved publisher to each revision namespace. Existing
+accepted remote revisions remain retained; no sync/bisync, trash or remote deletion
+operation is used.
+
+Fetch authenticates the expected current project/revision/hash through coordinator
+metadata, obtains bytes only from the selected delivery backend, and verifies them
+in private staging. Client application rechecks authenticated metadata and reuses
+the existing journal/draft/conflict protections. Missing or corrupt provider content
+never falls back to coordinator snapshot bytes. If the authority advances during
+transfer, a stale download is rejected and may be retried. An unavailable authority
+does not permit an unverified offline application.
+
+The transfer receipt's `deleted_paths` compares the saved accepted baseline with the
+new accepted snapshot. Its `local_deletions: not_applied` describes transfer only;
+inspect the separate `local` receipt and preserved drafts after application.
+Locally modified removed files remain protected. Remote historical revisions are
+retained, so a removed local file does not imply remote erasure.
+
+Actual Google Drive account delivery, independent recipients, provider revocation,
+offline reconciliation and mixed-device TEAM acceptance remain unexecuted gates.
+Local rclone fixtures and synthetic cross-OS tests do not establish those results.
+
 ## Migration and release gates
 
 `migration-plan SOURCE --destination FRESH_TARGET` is read-only. It inventories

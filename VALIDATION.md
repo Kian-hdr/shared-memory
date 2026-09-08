@@ -7,8 +7,54 @@ visibility is deferred until version 1 is finished. The source was transferred
 from commit `c4aaedbbeb959bce8b624efe2c83c91f96c8ee0d` with its history preserved.
 The separation changes repository navigation and documentation, not runtime behavior.
 Historical links below identify runs in the legacy repository and may require access
-after it becomes private. They are not new-repository CI results. Fresh product
-repository CI and package/release verification remain required.
+after it becomes private. They are not new-repository CI results. The new repository
+checkpoint below records its own completed validation separately.
+
+## Private product repository checkpoint, 2026-09-08
+
+At `3b648d08be8f47c698c47375e42c2ee9dc3a45c4`, the new repository's
+[CI matrix](https://github.com/Kian-hdr/shared-memory/actions/runs/34181376740)
+passed all twelve jobs and its
+[concurrent HTTPS rehearsal](https://github.com/Kian-hdr/shared-memory/actions/runs/34181380260)
+passed all four jobs with **111 packaged CLI calls**. All three OS clients used the
+same downloaded package, reached revision 3 and agreed on accepted content hash
+`8d721b8696ffdabe16a392582867e2dc1080131db29acfab8e166d839fd31ff7`.
+Private parent notes/settings/artifacts and original mixed-newline Unicode files
+remained byte-identical. Premature handoff writes were refused; server/tunnel stopped.
+
+The exact downloaded executable SHA-256 is
+`9b9068f635a5f55410b64c680fcb5039aad8872a2752939f6541b5be2f7451b7`;
+the committed source ZIP SHA-256 is
+`a823065728e6285b7f49b46487324976a2380b1c6c4be03c683a2925a465842f`.
+All 33 package entries and all 61 source files passed independent readback.
+These synthetic OS actors do not establish independent human setup, provider
+delivery, complete TEAM-11 or a production service. The private internal artifacts
+are preserved; no release/tag was created. Subsequent provider implementation is
+not included in this checkpoint.
+
+## Immutable revision delivery implementation, 2026-09-08
+
+The first explicit rclone adapter adds manifest-last immutable publication, bounded
+verified fetch, private reviewed Drive configuration, duplicate/unsafe/native-document
+refusal, and separate deletion-base receipts. The client checks current authenticated
+metadata before any recovery or project write, then uses its existing journal and
+draft protections. The CLI fetch path never substitutes coordinator snapshot bytes.
+Initial attachment remains through the coordinator.
+
+**174/174 product tests passed on macOS/Python 3.13.15 and 3.12.13, no skips.** This
+includes 20 delivery tests, 17 downloaded-client tests and five binding/packaged CLI
+tests beyond the previous 132. Independent review reran all 42 focused tests with no
+skips or blocking findings. Actual installed rclone 1.75.0 local-backend transfer,
+idempotent retry, accepted deletion and refusal of missing/corrupt remote fixture
+bytes passed. These are local fixtures, not Google Drive requests.
+
+CI now stages official rclone 1.75.0 using platform-specific reviewed SHA-256 hashes
+in a disposable runner directory, so its Windows/macOS/Linux product jobs exercise
+the actual local driver instead of skipping for missing rclone. The staging script
+was executed on macOS arm64 and verified the downloaded archive hash before extracting
+only its executable. Changed-source CI is still pending at this local checkpoint.
+No Google Drive account authentication, publication, sharing or provider request has
+been performed; actual account/recipient/mixed-device gates remain open.
 
 ## Completed c4aaedb cross-platform checkpoint, 2026-09-08
 

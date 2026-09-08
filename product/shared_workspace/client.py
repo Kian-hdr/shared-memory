@@ -536,6 +536,76 @@ class Client:
             return dict(self._receipt(), drafts=sorted(set(drafts)))
 
     @_io_errors
+    def accepted_snapshot(self):
+        """Return a fresh copy of the saved baseline, without journal recovery.
+
+        This describes accepted bytes, not the possibly edited project files or
+        a claim that this revision is still current at the coordinator.
+        """
+        with self._locked():
+            return self._base()
+
+    @_io_errors
+    def apply_downloaded(self, snapshot):
+        """Apply downloaded bytes to an attached client after authority checking.
+
+        The authenticated request callable supplies current metadata only. The
+        caller's download or provider receipt is never itself authority. A newer
+        coordinator revision requires downloading again before applying bytes.
+        """
+        target = _snapshot(snapshot)
+        with self._locked():
+            base = self._base()
+            if target['project_id'] != base['project_id']:
+                _error('project_mismatch', 'Downloaded snapshot belongs to another project.')
+
+            def check_progress(previous):
+                if target['revision'] < previous['revision']:
+                    _error('revision_rollback', 'Downloaded snapshot predates accepted client state.')
+                if target['revision'] == previous['revision'] and target['files_hash'] != previous['files_hash']:
+                    _error('revision_integrity', 'Downloaded bytes disagree with the same accepted revision.')
+
+            check_progress(base)
+            required_paths = set(base['files']) | set(target['files'])
+            # Recovery itself writes project files. Check its saved target before
+            # allowing any recovery, including the crash-after-state-commit case.
+            journal = self._load('journal.json', optional=True)
+            if journal is not None:
+                if not isinstance(journal, dict) or journal.get('schema_version') != 1:
+                    _error('client_state', 'Unknown materialization journal version.')
+                pending = _snapshot(journal.get('target'), base['project_id'])
+                previous = _snapshot(journal.get('base'), base['project_id'])
+                if (base not in (previous, pending) or pending['revision'] < previous['revision'] or
+                        (base == previous and pending['revision'] == previous['revision'] and
+                         pending['files_hash'] != previous['files_hash'])):
+                    _error('client_state', 'Materialization journal does not extend the saved accepted state.')
+                check_progress(pending)
+                required_paths.update(previous['files'])
+                required_paths.update(pending['files'])
+
+            status = self.request('status', {'limit': 1})
+            if (not isinstance(status, dict) or type(status.get('revision')) is not int or
+                    status['revision'] < 0 or not isinstance(status.get('files_hash'), str) or
+                    not re.fullmatch(r'[0-9a-f]{64}', status['files_hash'])):
+                _error('invalid_authority', 'Authenticated coordinator returned invalid snapshot metadata.')
+            if status.get('project_id') != base['project_id']:
+                _error('project_mismatch', 'Authenticated coordinator belongs to another project.')
+            if target['revision'] != status['revision'] or target['files_hash'] != status['files_hash']:
+                _error('download_not_current', 'Downloaded snapshot does not match current authenticated authority.', 4)
+            authority = {key: status[key] for key in ('project_id', 'revision', 'files_hash')}
+            # Preflight downloaded targets before recovery can mutate an older
+            # pending revision, including newly tracked binary or symlink paths.
+            self._scan(required_paths)
+            for name in required_paths:
+                self._target(name)
+            drafts = self._resume()
+            base = self._base()
+            check_progress(base)
+            drafts += self._materialize(target, base)
+            return dict(self._receipt(), drafts=sorted(set(drafts)),
+                        byte_source='provider_download', authority_check=authority)
+
+    @_io_errors
     def draft(self, proposal_id, assignment_id, evidence, claims=None):
         for label, value in [('proposal_id', proposal_id), ('assignment_id', assignment_id)]:
             if not isinstance(value, str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]{0,127}', value):

@@ -34,7 +34,11 @@ def capabilities(provider, account_type="unspecified", system=None):
             "provider_receipt": "not_applicable" if provider == "local" else "unverified",
             "product_support": "local_checks_only" if local_route else "blocked",
             "required_checks": [] if provider == "local" else ["account_and_policy", "client_or_mount_version", "authorized_recipient", "actual_delivery", "offline_recovery"],
-            "api_adapter": "not_implemented", "official_source": SOURCES.get(provider),
+            "api_adapter": "rclone_immutable_revision_development" if provider == "google-drive" else "not_implemented",
+            "explicit_delivery_route": "google_drive_rclone" if provider == "google-drive" else None,
+            "explicit_delivery_live_acceptance": "not_run",
+            "report_scope": "existing_local_folder_inspection; explicit delivery is a separate command",
+            "official_source": SOURCES.get(provider),
             "sources_checked": "2026-09-08", "mixed_os_team_gate": "not_run"}
 
 

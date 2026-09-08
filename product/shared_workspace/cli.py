@@ -13,6 +13,7 @@ from .errors import ProductError
 from . import project
 from . import workflow
 from . import maintenance
+from . import delivery_workflow
 
 COMMANDS = ("version", "guide", "capabilities", "create", "join", "doctor", "status", "work", "teammate-prompt")
 
@@ -23,7 +24,7 @@ class Parser(argparse.ArgumentParser):
 
 
 def parser() -> argparse.ArgumentParser:
-    result = Parser(prog="shared-workspace", description="Selected-folder collaboration CLI preview. No provider or app automation.")
+    result = Parser(prog="shared-workspace", description="Selected-folder collaboration CLI preview with explicit revision delivery.")
     result.add_argument("--bundle", help="Explicit reviewed built directory or package for source-mode execution")
     commands = result.add_subparsers(dest="command", required=True, parser_class=Parser)
     commands.add_parser("version", help="Show exact package identity and build provenance")
@@ -50,18 +51,24 @@ def parser() -> argparse.ArgumentParser:
     prompt.add_argument("--access-locator")
     workflow.add_commands(commands)
     maintenance.add_commands(commands)
+    delivery_workflow.add_commands(commands)
     return result
 
 
 def capabilities() -> dict:
     return {
-        "commands": list(COMMANDS) + list(workflow.TEAM_COMMANDS) + list(maintenance.COMMANDS),
+        "commands": list(COMMANDS) + list(workflow.TEAM_COMMANDS) + list(maintenance.COMMANDS) + list(delivery_workflow.COMMANDS),
         "implemented": {"selected_folder_setup": True, "portable_project_identity": True,
                         "trusted_bundle_execution": True, "json_output": True,
                         "advisory_claims_handoffs_and_evidence": True,
                         "atomic_coordinator_acceptance": True, "authenticated_membership": True,
                         "preserved_offline_drafts": True, "recoverable_materialization": True,
                         "reviewed_package_installation": True, "local_receipt_verification": True},
+        "explicit_delivery": {"commands": list(delivery_workflow.COMMANDS),
+                              "routes": ["local_fixture", "google_drive_rclone"],
+                              "initial_join": "coordinator_attach_required",
+                              "google_drive_live_acceptance": "not_run",
+                              "automatic_sharing_or_login": False},
         "unsupported": {"verified_hosted_deployment": True, "provider_sync_automation": True, "provider_access_configuration": True,
                         "editor_write_exclusion": True, "multi_file_filesystem_atomicity": True, "federated_login": True,
                         "automatic_app_setup": True, "automatic_history_repair": True},
@@ -111,7 +118,9 @@ def main(argv=None) -> int:
             if hasattr(args, name) and not getattr(args, name).strip():
                 raise ProductError(2, "usage_error", f"--{name} cannot be empty.")
         with open_bundle(args.bundle) as bundle:
-            if command in maintenance.COMMANDS:
+            if command in delivery_workflow.COMMANDS:
+                data = delivery_workflow.dispatch(bundle, args)
+            elif command in maintenance.COMMANDS:
                 data = maintenance.dispatch(bundle, args)
             elif command in workflow.TEAM_COMMANDS:
                 data = workflow.dispatch(bundle, args)
@@ -156,4 +165,3 @@ def main(argv=None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

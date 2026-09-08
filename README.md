@@ -40,6 +40,11 @@ revision acceptance, preserved conflicts/offline drafts, recoverable file update
 owner/recipient setup and verified package installation/rollback. It requires Python
 3.11+. Obsidian remains optional.
 
+Explicit `delivery-publish` / `delivery-fetch` commands add immutable revision
+transfer through a reviewed rclone route. Already attached clients authenticate
+downloaded bytes against coordinator metadata before journaled application. Local
+fixtures are covered; the Google Drive account route still needs live validation.
+
 This is an experimental development build. Existing automated tests and HTTPS
 rehearsals are recorded in [validation](VALIDATION.md); real provider delivery,
 independent recipient onboarding and complete TEAM-11 remain open. Stable V1 is
@@ -208,9 +213,10 @@ Windows, macOS and Linux are first-class targets for the core, CLI and agent
 workflow from the start. Equivalent behavior and same-project mixed-device
 collaboration are required release criteria, not inferred from portable source.
 Provider/account/OS support is tracked separately in the [capability matrix](docs/READINESS.md#provideraccountos-capability-and-verification-matrix).
-The authenticated server and local folder receipt adapters are implemented.
-Reachable hosted/self-hosted deployment, vendor API adapters and real provider
-delivery still need implementation or validation; Obsidian is optional throughout.
+The authenticated server, local folder receipt checks and first explicit rclone
+revision adapter are implemented. A persistent reviewed deployment, actual Google
+Drive delivery and the remaining provider routes need validation or implementation;
+Obsidian is optional throughout.
 
 Strengthen the independent folder/Markdown core and consistent agent interfaces
 first. After real workflows are validated, a lightweight companion can expose
