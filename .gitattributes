@@ -1,0 +1,6 @@
+# Preserve reviewed text bytes across build hosts; binary assets stay unchanged.
+* text=auto eol=lf
+*.png binary
+*.icns binary
+*.zip binary
+*.pyz binary

@@ -1,12 +1,36 @@
-# Shared Memory setup guide
+# Shared Memory setup routes
 
 Prefer agent-guided setup? [Copy this prompt into your own chat](../SETUP-PROMPT.md).
 It discovers your target and handles either owner setup or joining an existing project.
 
+## Experimental product setup
+
+For **v0.2.0-alpha.1** (runtime version `0.2.0`), use the
+[product operating guide](PRODUCT-V1.md#obtain-and-install-the-exact-reviewed-package).
+Verify the actual release archive against its external `SHA256SUMS` before execution.
+Use Python 3.11+ and your own selected project folder plus separate private local
+state. First trials belong in disposable projects or backed-up working copies.
+
+- **Owner:** `init` creates the project's authority. Local-only needs no server or account; schema 2 is an explicit configuration for session coordination.
+- **Teammate:** `attach` uses your own member token, expected project ID, reachable authorized endpoint and local paths. Joining does not initialize or upgrade the authority.
+- **Existing product client:** use `refresh`, `team-status` and `receipt`; preserve drafts and recovery state.
+
+The product is a CLI/runtime, not a native app or hosted service. A selected subfolder
+inside your private Obsidian vault is valid; ordinary folder setup does not launch
+Obsidian or alter vault settings. Provider access and independent-device acceptance
+remain separate from successful local setup.
+
+## Legacy advisory tracker setup
+
+Everything below installs or maintains **toolkit 1.3.0**, the advisory Markdown
+tracker. It requires Python 3.9+ and does not install the authoritative 0.2.0 engine,
+authenticate members or serve accepted revisions. Choose this route explicitly;
+do not use it as a fallback when a product package is unavailable.
+
 ## Ordinary folders are the default
 
-The core runs in a project folder using Python and Markdown. It does not need
-Obsidian, a vault, an app launch or an Obsidian account. Setup includes an inert
+The legacy tracker runs in a project folder using Python and Markdown. It does not
+need Obsidian, a vault, an app launch or an Obsidian account. Its setup includes an inert
 Workspace.base dashboard file for users who want that optional view; the file is
 part of the generated package, not a runtime dependency on the Obsidian app.
 
@@ -27,8 +51,9 @@ placement/synchronization depends on the chosen provider; it is not automatic.
 For explicitly requested full computer readiness, the setup prompt authorizes
 the needed local installations and configuration. Folder-only setup reuses working
 apps and does not require opening Obsidian.
-Its agent installs missing Obsidian, a compatible Python, and only the client or
-prerequisites required by your selected access method, then opens the correct vault.
+Its agent installs a compatible Python and only the prerequisites required by your
+chosen workflow. Obsidian installation and opening the correct vault are included
+only when explicitly requested.
 If you choose Homebrew and it is missing, the agent installs it, completes shell/PATH
 configuration, and checks that it works. Routine authorized steps do not need another
 permission question. Your actual approval policy and required authentication or

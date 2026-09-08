@@ -7,14 +7,31 @@ The product name is Shared Memory. Obsidian is optional. The product repository 
 and protocol identifiers retain compatibility. The
 name is a product decision; trademark and domain clearance are unverified.
 
+## Experimental prerelease policy
+
+Public experimental publication is authorized for **v0.2.0-alpha.1**, with runtime
+version `0.2.0`. This supersedes the earlier private-until-finished-V1 restriction.
+The alpha is for controlled trials with disposable projects or backed-up working
+copies. It is not a stable release, native application, managed hosting service or
+proof of production/provider readiness. Release availability and exact package
+checksums are recorded on the actual release page when published.
+
+All **TEAM-01–TEAM-11, COORD and GRAPH criteria remain stable-V1 graduation gates**.
+Publishing an alpha does not waive them or turn skipped, simulated or unavailable
+checks into passes. Automated Windows/macOS/Linux CI and same-project HTTPS runner
+rehearsals remain distinct from independent people on their own devices, real
+provider/account delivery and sustained operator-owned deployment. The detailed
+[validation record](../VALIDATION.md) is authoritative for versioned test evidence.
+
 ## Independent product repository, 2026-09-08
 
 Kian selected a separate repository for Shared Memory because its scope has grown
 beyond the original Obsidian workspace toolkit. This supersedes the earlier plan
 to rename the toolkit repository at first-version launch. The product uses
-`Kian-hdr/shared-memory`; the original repository remains the private legacy toolkit record. The new product repository also remains private during
-development and becomes public only when version 1 is finished, as Kian specified.
-Source history and attribution are preserved.
+`Kian-hdr/shared-memory`; the original repository remains a separate legacy toolkit
+record, with access controlled independently. The original private-until-V1 plan is
+superseded by the experimental prerelease policy above. Source history and attribution
+are preserved.
 
 Current setup, clone and download navigation point to the product repository.
 Historical CI links in the validation record retain their original provenance and
@@ -34,8 +51,9 @@ establish synchronization, concurrency or recovery guarantees.
 
 The product is a coordination engine with readable project knowledge, consistent
 agent interfaces and a thin human interface. AGENTS.md explains how to use it; the
-instruction file is not the entire system. The following specification is accepted
-design direction, not a description of implemented 1.3.0 capabilities.
+instruction file is not the entire system. The following specification retains the complete product direction and graduation
+requirements. Use [the operating guide](PRODUCT-V1.md) for implemented 0.2.0
+commands and [validation](../VALIDATION.md) for the evidence supporting each claim.
 
 ## Short product specification
 
@@ -176,7 +194,9 @@ provider/recipient/mixed-device gates are unavailable.
 ## Approved autonomous coordination and graph extension, 2026-09-08
 
 These accepted requirements define the extension acceptance contract. Implementation
-and evidence are tracked separately; listing a requirement does not mark it passed. Keep private development until finished V1 and retain TEAM-01–TEAM-11.
+and evidence are tracked separately; listing a requirement does not mark it passed.
+Retain TEAM-01–TEAM-11 and the COORD/GRAPH criteria as stable-V1 graduation gates,
+independent of experimental prerelease availability.
 
 Autonomy is primary: discover available setup details and ask only for essential
 undiscoverable folder/execution/membership/budget/constraint choices. Routine work
@@ -258,8 +278,8 @@ in the core design and automated tests from the start. Define the API and test a
 with a separate toy model, and do not report skipped/unimplemented tests as passes.
 The 1.3.0 scripted local demo is a useful regression fixture, not this team suite.
 
-**Status, 2026-09-08:** the authoritative engine/client, recovered owner setup,
-packaged CLI and explicit revision delivery now pass **174/174 local product tests**
+**Historical 174-test checkpoint, 2026-09-08:** the authoritative engine/client, recovered owner setup,
+packaged CLI and explicit revision delivery passed **174/174 local product tests**
 on Python 3.13.15 and 3.12.13. Independent review reran the 42 new focused delivery,
 client and packaged command cases. Actual local rclone transfer/retry and rejection
 of missing/corrupt provider fixtures passed without using coordinator bytes as a
@@ -268,8 +288,9 @@ three-OS checkpoint and 111-command same-project HTTPS trial passed at 3b648d0;
 changed-source cross-OS validation is tracked separately in GitHub Actions and
 [validation](../VALIDATION.md). Synthetic actors and local fixtures are bounded
 engineering evidence. Real provider accounts, independent recipients and full
-TEAM-11 remain unverified. Both product and legacy repositories are private;
-public V1 requires completion of the retained release gates.
+TEAM-11 were not established by that checkpoint. Current results are recorded in
+[validation](../VALIDATION.md); stable V1 requires completion of the retained gates.
+The experimental publication policy does not change those acceptance requirements.
 
 | ID | Scenario and observable acceptance |
 | --- | --- |
@@ -283,14 +304,14 @@ public V1 requires completion of the retained release gates.
 | TEAM-08 | External editor or sync-client modification is detected as a proposal; it cannot silently replace accepted knowledge; both versions remain available |
 | TEAM-09 | Interrupt each acceptance/materialization boundary and restart: no lost accepted history or drafts, no duplicate acceptance, and a consistent recoverable revision/file state |
 | TEAM-10 | Selected provider delivers the expected accepted content to the other computer; interrupted/delayed delivery is partial or blocked, never inferred ready from existence alone |
-| TEAM-11 | Required first-release gate: Windows, macOS and Linux users collaborate on the SAME project under different local paths; ownership, accepted revisions, conflicting proposals and handoff acceptance remain consistent; each provider route proves revision/hash receipt and relevant offline/recovery behavior |
+| TEAM-11 | Required stable-V1 graduation gate: Windows, macOS and Linux users collaborate on the SAME project under different local paths; ownership, accepted revisions, conflicting proposals and handoff acceptance remain consistent; each provider route proves revision/hash receipt and relevant offline/recovery behavior |
 
 Capture expected and actual revisions, content hashes, proposal/acceptance IDs,
 validation output, device/provider versions, fault injection points and recovery
 results. Run local-only contract checks without an account, and mark real-device or
 provider gates not run when their authorized environment is unavailable. Extend
 providers and swarm automation only after this vertical workflow passes. The
-first-release claim additionally requires TEAM-11 on actual mixed-OS devices,
+stable-V1 claim additionally requires TEAM-11 on actual mixed-OS devices,
 not three isolated unit-test runs. This requirement is future acceptance, not
 completed evidence.
 
@@ -306,8 +327,8 @@ commands are not yet a stable versioned engine API.
 ## Historical first CLI checkpoint, 2026-09-08
 
 Product V1 is a complete-product milestone, separate from toolkit 1.3.0. Thursday,
-2026-09-10, is the target; it does not waive TEAM-11 or authorize publication. The
-current implementation milestone is a **local CLI preview 0.1.0**, reusing the
+2026-09-10, was the pitch target for this historical checkpoint; it did not waive
+TEAM-11. The then-current milestone was a **local CLI preview 0.1.0**, reusing the
 existing tracker behind a versioned JSON envelope, safe create/join, exact bundle
 identity and project-specific teammate prompts. See [the frozen implementation
 contract](../product/CONTRACT.md). This milestone does not introduce a coordinator
@@ -373,15 +394,15 @@ revisions measured 34 ms p95 acceptance, 175 ms local receipt and 1.14 s unchang
 refresh; first materialization took 0.98 s. These one-Mac measurements are engineering
 evidence for this profile, not a production capacity, latency SLA or cloud result.
 
-Remaining release evidence: clean independent recipient setup, a reachable reviewed coordinator deployment, real provider/account
+Remaining stable-V1 graduation evidence: clean independent recipient setup, a reachable reviewed coordinator deployment, real provider/account
 delivery and offline recovery, and all three OS clients on the same project under
-TEAM-11. Repository separation is authorized. Public visibility must wait for completed
-version 1; deployment and provider readiness remain separate requirements. Live Vault migration remains gated on validated readiness and
+TEAM-11. An explicitly experimental public alpha is authorized; stable V1,
+deployment and provider readiness remain separate requirements. Live Vault migration remains gated on validated readiness and
 the owner's confirmed backup, second-drive working copy and target.
 
 ### Validated local coordination extension
 
-The opt-in schema-2 implementation now passes 273 local product tests on both
+At an earlier checkpoint, the opt-in schema-2 implementation passed 273 local product tests on both
 Python 3.13 and 3.12. A real packaged 57-command rehearsal covers separate actor
 sessions, fenced ownership, duplicate/overlap refusal, recipient handoff, stale
 context refusal and exact revision receipt. Same-actor delegation preserves identity;
@@ -422,7 +443,7 @@ it does not independently judge a deliverable's quality.
 | Attendee entry point | Compact prompt, diagnostic next steps, no account requirement for local-only | Implemented; fresh-machine onboarding still open |
 | Optional visual rehearsal | Isolated selected-folder graph/navigation checked in native Obsidian | Synthetic fixture verified; ordinary folder setup needs no app launch |
 | Stage rehearsal | Run in the presentation environment within the available speaking time; test TV connection | Presenter/venue check still needed |
-| Audience download | Complete V1 release gates before any public installation promise | Product remains private; pitch has no public setup link |
+| Audience download | Actual published alpha assets, external checksums and matching setup prompt; maturity and open gates explicit | Experimental prerelease authorized; availability must be checked on its release page |
 
 Keep the five-minute pitch focused on the problem, ordinary files, one concrete
 handoff and the remaining acceptance work. The 90-second demo is an optional walkthrough, not
@@ -436,7 +457,7 @@ two authorized computers, two separate agent sessions and one selected provider.
 Name a human integration owner and record the authority for each target. Actual
 provider selection, accounts and devices remain implementation inputs to resolve.
 Then execute TEAM-11 with Windows, macOS and Linux on the same project before
-first-release acceptance. The initial two-person milestone does not defer Linux
+stable-V1 acceptance. The initial two-person milestone does not defer Linux
 core/client support. No fresh-device or provider readiness is inferred from the
 local candidate tests.
 

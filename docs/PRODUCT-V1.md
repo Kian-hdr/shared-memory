@@ -1,10 +1,13 @@
-# Shared Memory: operating the development build
+# Shared Memory: operating the experimental prerelease
 
 **A shared workspace for your team and its AI agents.**
 
-Product **0.2.0 development** contains the authoritative engine and local client.
-Obsidian is optional. This is not a completed stable V1 release: actual cloud-provider
-receipt, independent recipient onboarding and mixed-OS TEAM-11 remain unverified.
+Product **0.2.0**, prerelease **v0.2.0-alpha.1**, contains the authoritative engine
+and local client. It is experimental software for controlled trials in disposable
+projects or backed-up working copies. Obsidian is optional; no native application or
+hosted service is included. Actual provider receipt, independent-person onboarding
+and full TEAM-11 remain stable-V1 graduation gates. Automated cross-OS runner
+results are recorded separately in [validation](../VALIDATION.md).
 The product source is [Kian-hdr/shared-memory](https://github.com/Kian-hdr/shared-memory).
 Executable/protocol identifiers retain compatibility. Toolkit 1.3.0 and historical
 CLI 0.1.0 are separate versions.
@@ -53,9 +56,12 @@ repeated permission requests; protected sign-in/MFA/OS consent and actual sharin
 permission changes remain their own gates.
 
 Obtain a specific reviewed package and its expected SHA-256 from the approved
-source. A package's self-reported hashes do not authenticate its publisher. This
-development source lives in this independent repository. Select its exact reviewed
-revision and package; do not substitute the separate historical toolkit.
+source. The expected alpha asset names are `shared-memory-0.2.0-alpha.1.pyz` and
+`SHA256SUMS` on [v0.2.0-alpha.1](https://github.com/Kian-hdr/shared-memory/releases/tag/v0.2.0-alpha.1).
+Download only assets actually present there; otherwise obtain an explicitly reviewed
+source revision or package. The checksum is external to the executable archive. It
+checks downloaded bytes against the trusted release source; a package's own hashes
+do not authenticate its publisher. Do not substitute the historical advisory toolkit.
 
 Verify the downloaded bytes without executing the package. Compare against the
 external SHA-256 supplied through the approved source; stop on a mismatch:
@@ -78,8 +84,28 @@ Windows can use `py -3.13`; macOS/Linux use their installed compatible interpret
 Installation keeps immutable `versions/<sha256>.pyz` files and a private activation
 pointer. Interrupted copies cannot occupy the final package path. Rollback selects
 a previously verified runtime with `rollback-package --tools-dir ... --sha256 ...`.
-It never migrates a project's schema or replaces another owner's tracker. Source
-builds use `python scripts/build_product.py --output FRESH_OUTPUT.pyz` in a Git checkout.
+It never migrates a project's schema or replaces another owner's tracker. Keep using
+the returned immutable `versions/<sha256>.pyz` path for subsequent commands. The
+installer does not add a command to PATH. Optional skill/icon archives are separate
+assets; the skill alone does not install the engine, and icons are not an app.
+
+For a source build, select an explicitly reviewed Git revision outside the project
+and run `python scripts/build_product.py --output FRESH_OUTPUT.pyz`. The output file
+must not exist and its parent must already exist. The builder records source commit,
+dirty status and bundle identity; it does not download dependencies. A local source
+build is separate evidence from the published release package.
+
+For a distributable alpha, use `python scripts/build_release.py --output FRESH_DIRECTORY`
+from a reviewed, committed checkout. Keep that fresh output outside the checkout.
+The release builder takes every payload from exact Git HEAD blobs, compares tracked
+working bytes directly, and emits the runtime, complete source/runtime kit, skill,
+icons, setup prompt, release manifest and external checksums. It refuses hidden
+tracked edits as well as ordinary dirty changes. Ignored files are excluded from
+both release and development packages; legitimate new development files make a
+source build dirty. Do not present a `source_dirty: true` package as an exact release.
+ZIP order, timestamps and creator metadata are fixed; byte reproducibility still
+requires matching Python/compressor behavior. Verify the published artifact's own
+external checksum rather than substituting a locally rebuilt hash.
 
 ## Owner setup
 
@@ -125,7 +151,10 @@ authoritative workflow. Do not confuse their guarantees.
 
 The authority must remain reachable. A server on a sleeping/disconnected laptop
 cannot provide team availability. Deployment is not created by a setup prompt.
-For a reviewed self-hosted environment, install `requirements-server.txt` and run:
+For a reviewed self-hosted environment, obtain the pinned `server_dependencies`
+text returned by `guide` from the exact verified package, or the matching source
+revision's `requirements-server.txt`. Install it in a dedicated environment with
+`python -m pip install -r requirements-server.txt`, then run:
 
 ```text
 python PACKAGE.pyz serve --database PRIVATE_STATE/coordinator.sqlite3 --host HOST --port PORT --certfile CERTIFICATE --keyfile PRIVATE_KEY
@@ -473,13 +502,15 @@ Local rclone fixtures and synthetic cross-OS tests do not establish those result
 
 `migration-plan SOURCE --destination FRESH_TARGET` is read-only. It inventories
 hashes, excluded private state and unresolved/ambiguous links. It does not move files,
-change sharing or authorize migration. For the existing live Vault, first establish
-validated product readiness; its owner then backs it up, copies it to a second drive
-and explicitly identifies/confirms the intended working target before migration.
+change sharing or authorize migration. For live data, follow its owner's backup,
+working-copy and explicit target-approval requirements as a separate operation.
+An alpha setup trial is not authorization to restructure a live vault or backup drive.
 
 The development build has local transaction, recovery, package and TLS evidence.
 Limits: 10 MiB per accepted text file, 100 MiB accepted snapshot, 10,000 files,
 128 MiB protocol envelope. These bounds are not a tested production capacity.
-Windows/Linux execution, actual provider/account routes, real independent-recipient
-use and same-project mixed-OS TEAM-11 remain release gates. See
+Automated Windows/macOS/Linux execution and HTTPS runner rehearsals are bounded
+engineering evidence. Actual provider/account routes, independent recipients and
+complete same-project mixed-device TEAM-11 remain stable-V1 graduation gates.
+An experimental prerelease does not mark those gates passed. See
 [validation](../VALIDATION.md) and [the readiness roadmap](READINESS.md).

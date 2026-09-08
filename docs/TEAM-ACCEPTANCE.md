@@ -1,18 +1,22 @@
 # Shared Memory real-device acceptance runbook
 
-Prepared 2026-09-08. **Not executed.** This procedure gathers the missing TEAM
-release evidence for the schema-2 product. Schema-1 rehearsals are historical
+Prepared 2026-09-08. **The full three-participant/provider procedure has not been
+executed.** Partial real Mac/Linux trials and automated cross-OS checks are recorded
+in [VALIDATION.md](../VALIDATION.md). This procedure gathers remaining stable-V1
+graduation evidence for the schema-2 product; it does not block an honestly labelled
+experimental prerelease. Schema-1 rehearsals are historical
 compatibility evidence and do not pass the session/coordination extension gates.
 It does not authorize deployment, sharing, account changes,
 credential delivery or publication. Use only disposable public/synthetic project
-content. Do not use the live Exlumina Vault or backup drives.
+content. Do not use a production vault or backup drives as test fixtures.
 
 ## Required environment
 
 Name an integration owner and three actual participants on Windows, macOS and
 Linux. Record OS/Python/agent versions, distinct actor IDs, the exact reviewed
 runtime SHA-256 and bundle ID, and different selected local paths. The latest
-reviewed package/evidence is identified by the delivery README. Verify its external
+reviewed package/evidence is identified by the [release page](https://github.com/Kian-hdr/shared-memory/releases)
+and [validation record](../VALIDATION.md). Verify its external
 checksum before executing it. Keep private state outside all synchronized folders.
 
 Use one project UUID and one reviewed reachable HTTPS coordinator for the whole

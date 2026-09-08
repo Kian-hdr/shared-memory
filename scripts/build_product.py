@@ -52,35 +52,74 @@ raise SystemExit(main())
 '''
 
 
-def build(output: Path) -> dict:
+def build(output: Path, *, source_files: dict[str, bytes] | None = None,
+          source_revision: str | None = None) -> dict:
+    """Build working development inputs, or an explicitly verified source map.
+
+    Release callers supply the complete immutable HEAD blob map and its revision
+    after validating the checkout. That path never reads payload bytes from disk.
+    """
     if output.exists():
         raise ValueError("Refusing to replace an existing output; choose a fresh artifact path.")
     if not output.parent.is_dir():
         raise ValueError("The output parent directory must already exist.")
-    modules = ROOT / "product/shared_workspace"
-    skill = ROOT / "skills/setup-shared-project-workspace"
-    if not (modules / "cli.py").is_file() or not (modules / "__init__.py").is_file():
+    if (source_files is None) != (source_revision is None):
+        raise ValueError("Verified source bytes and their revision must be supplied together.")
+    inputs = {}
+    if source_files is None:
+        eligible = set(subprocess.check_output(
+            ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
+            cwd=ROOT).decode().split("\0"))
+        modules = ROOT / "product/shared_workspace"
+        skill = ROOT / "skills/setup-shared-project-workspace"
+        for source in sorted(modules.rglob("*.py")):
+            if source.relative_to(ROOT).as_posix() not in eligible:
+                continue
+            if source.is_symlink():
+                raise ValueError("Source symlinks are not package inputs.")
+            inputs[source.relative_to(ROOT).as_posix()] = source.read_bytes()
+        for source in sorted(skill.rglob("*")):
+            if source.relative_to(ROOT).as_posix() not in eligible:
+                continue
+            if "__pycache__" in source.parts or source.suffix in {".pyc", ".pyo"}:
+                continue
+            if source.is_symlink():
+                raise ValueError("Skill symlinks are not package inputs.")
+            if source.is_file():
+                inputs[source.relative_to(ROOT).as_posix()] = source.read_bytes()
+        for name in ("LICENSE", "docs/PRODUCT-V1.md", "docs/KNOWLEDGE-GRAPH.md", "requirements-server.txt"):
+            inputs[name] = (ROOT / name).read_bytes()
+    else:
+        for name, data in source_files.items():
+            if (not isinstance(name, str) or not name or name.startswith("/") or "\\" in name
+                    or any(part in {"", ".", ".."} for part in name.split("/")) or not isinstance(data, bytes)):
+                raise ValueError("Verified source map requires relative POSIX paths and exact bytes.")
+        inputs = dict(source_files)
+    if any(name not in inputs for name in ("product/shared_workspace/cli.py", "product/shared_workspace/__init__.py")):
         raise ValueError("Product implementation is incomplete: cli.py and __init__.py are required.")
     payload = {"__main__.py": BOOTSTRAP.encode("utf-8")}
-    for source in sorted(modules.rglob("*.py")):
-        if source.is_symlink():
-            raise ValueError("Source symlinks are not package inputs.")
-        payload["shared_workspace/" + source.relative_to(modules).as_posix()] = source.read_bytes()
-    for source in sorted(skill.rglob("*")):
-        if "__pycache__" in source.parts or source.suffix in {".pyc", ".pyo"}:
-            continue
-        if source.is_symlink():
-            raise ValueError("Skill symlinks are not package inputs.")
-        if source.is_file():
-            payload["bundle/skills/setup-shared-project-workspace/" + source.relative_to(skill).as_posix()] = source.read_bytes()
-    payload["LICENSE"] = (ROOT / "LICENSE").read_bytes()
-    payload["PRODUCT-GUIDE.md"] = (ROOT / "docs/PRODUCT-V1.md").read_bytes()
-    payload["KNOWLEDGE-GRAPH.md"] = (ROOT / "docs/KNOWLEDGE-GRAPH.md").read_bytes()
-    payload["requirements-server.txt"] = (ROOT / "requirements-server.txt").read_bytes()
+    for name, data in sorted(inputs.items()):
+        if name.startswith("product/shared_workspace/") and name.endswith(".py"):
+            payload[name.removeprefix("product/")] = data
+        elif name.startswith("skills/setup-shared-project-workspace/"):
+            if "__pycache__" not in name.split("/") and Path(name).suffix not in {".pyc", ".pyo"}:
+                payload["bundle/" + name] = data
+    for destination, source in (("LICENSE", "LICENSE"), ("PRODUCT-GUIDE.md", "docs/PRODUCT-V1.md"),
+            ("KNOWLEDGE-GRAPH.md", "docs/KNOWLEDGE-GRAPH.md"), ("requirements-server.txt", "requirements-server.txt")):
+        payload[destination] = inputs[source]
     files = {name: hashlib.sha256(data).hexdigest() for name, data in sorted(payload.items())}
     bundle_id = hashlib.sha256(json.dumps(files, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-    source_revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
-    source_dirty = bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True).strip())
+    if source_files is None:
+        source_revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        source_dirty = bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True).strip())
+        # Development may deliberately include new nonignored work, but cannot
+        # call those bytes clean. Special index flags hide modifications
+        # from status; conservatively mark those inputs dirty even if unchanged.
+        entries = subprocess.check_output(["git", "ls-files", "-v", "-z"], cwd=ROOT).decode().split("\0")
+        tracked = {entry[2:]: entry[0] for entry in entries if entry}
+        source_dirty |= any(name not in tracked or tracked[name] != "H" for name in inputs)
+    else:
+        source_dirty = False
     metadata = {"product_version": PRODUCT_VERSION, "toolkit_version": TOOLKIT_VERSION,
                 "source_revision": source_revision, "source_dirty": source_dirty,
                 "engine_protocol": 1, "bundle_id": bundle_id, "files": files}
@@ -90,6 +129,7 @@ def build(output: Path) -> dict:
         with zipfile.ZipFile(handle, "w", zipfile.ZIP_DEFLATED) as archive:
             for name, data in sorted(payload.items()):
                 info = zipfile.ZipInfo(name, date_time=(2020, 1, 1, 0, 0, 0))
+                info.create_system = 3
                 info.compress_type = zipfile.ZIP_DEFLATED
                 info.external_attr = 0o644 << 16
                 archive.writestr(info, data)

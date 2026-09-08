@@ -2,7 +2,7 @@
 
 Implementation target: product 0.2.0 development, not a stable release. This extends
 CONTRACT.md's historical 0.1.0 CLI preview; all TEAM requirements in docs/READINESS.md
-remain in force. The live Exlumina Vault is never a test or migration target.
+remain in force. An existing production vault must never be used as a disposable test target.
 
 ## Ownership and interfaces
 
@@ -168,8 +168,11 @@ failure injection, persistent reopen/retry, stale compatible and conflicting
 proposals, semantic conflicts, auth/revocation, ownership/handoff, offline draft
 survival and external edit preservation. CLI + loopback HTTP must integrate these
 same modules. A test fixture or loopback service is not a real cloud/provider run.
-Windows/Linux and actual mixed-OS/provider TEAM-10/11 remain explicit external gates.
+Windows/macOS/Linux automated checks and real Mac/Linux trial results are recorded
+in VALIDATION.md. Full independent-user and provider TEAM-10/11 remain stable-V1
+acceptance gates; they do not block an explicitly experimental prerelease.
 
-Migration is preparation only: after validated readiness, Kian backs up the live
-Vault and copies it to a second drive, then explicitly identifies and confirms the
-working target. No live Vault restructuring/sharing or backup-drive writes now.
+Migration is preparation only. Before migrating an existing production workspace,
+the owner must verify a current backup and explicitly identify the intended working
+copy. Setup or package publication does not authorize restructuring a live vault,
+changing its sharing permissions or writing to backup drives.

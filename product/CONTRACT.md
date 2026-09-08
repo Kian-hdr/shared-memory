@@ -1,6 +1,8 @@
 # Shared Memory: Product V1 first milestone CLI contract
 
-Status: implementation contract for product preview 0.1.0, not a stable V1 release.
+Status: historical implementation contract for product preview 0.1.0. Current
+authoritative-runtime behavior is specified in ENGINE-CONTRACT.md and
+../docs/PRODUCT-V1.md. This milestone record is not the current capability matrix.
 The toolkit's 1.3.0 version is separate. This milestone reuses its existing Python
 tracker; no team coordinator, SQLite database, network service, provider adapter or
 Obsidian dependency is introduced. Python 3.11+ is the supported product range;
@@ -81,5 +83,7 @@ repair/history deletion. No capability or test label claims hosted/remote readin
 
 TEAM-01/02/04 have only bounded local coverage here. TEAM-03 and TEAM-05 through
 TEAM-11 remain not run/unsupported except existing sequential tracker regressions.
-No approved candidate remote CI route or Windows/Linux hardware is available yet.
+At this historical milestone, no approved candidate remote CI route or
+Windows/Linux hardware was available. Current automated and device evidence is
+recorded separately in ../VALIDATION.md.
 The first stable release still requires the accepted mixed-OS TEAM-11 gate.

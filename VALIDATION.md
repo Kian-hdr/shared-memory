@@ -1,5 +1,79 @@
 # Validation record
 
+## Current release scope, 2026-09-08
+
+The public `v0.2.0-alpha.1` candidate is an experimental release. Publication no
+longer waits for every stable-V1 gate; all TEAM/COORD/GRAPH requirements remain
+tracked in [READINESS.md](docs/READINESS.md). Dated entries below record historical
+checkpoints, including failed and withheld candidates. Their old private/public
+status does not override this current release scope. Final artifact validation is
+recorded with its exact revision and hashes in the GitHub prerelease.
+
+At source `bdf8f54`, [the twelve-job matrix](https://github.com/Kian-hdr/shared-memory/actions/runs/34250200466)
+passed. Each product job collected 356 tests: Windows 352 passed/four skipped,
+macOS 336 passed/twenty skipped, Ubuntu 334 passed/twenty-two skipped. Both Windows
+runtimes executed actual junction regressions. Every product job also passed the
+57-call coordination and 20-call graph rename rehearsals. The matching
+[four-job same-project HTTPS rehearsal](https://github.com/Kian-hdr/shared-memory/actions/runs/34250215586)
+passed 438 calls, including four expected refusals, with matching accepted files
+and preserved private fixture bytes across all three OS runners. These are actual
+OS runners executing automated participants, not independent users.
+
+A separate real Mac/Linux trial used reasoning agents, distinct membership sessions,
+source-conflict review and an explicit handoff. A second round held two original
+base-5 proposals pending before integration; both outputs survived at revisions
+6 and 7. Repeat submission and acceptance created no extra revisions. All five
+assignments completed, and the two participating clients matched all ten accepted
+files at revision 7. Both actors represented one human. Recorded author intervals
+overlapped without a cross-host clock-error measurement.
+
+A copy of the Linux-origin revision-5 backup was actually restored on an isolated
+Mac HTTPS coordinator. Six historical snapshots, five original proposals, three
+assignments, a conflict, 69 events and eight files matched; a fresh client then
+accepted/completed a new write. The live authority was unchanged. The later
+revision-7 backup passed transfer/hash/SQLite checks but was not separately restored.
+An independent agent inspected the saved trial databases and file bytes. Raw
+operational records, identities, endpoints, credentials and databases are retained
+privately and are not release assets. Reproducible automated evidence is provided
+by the source tests, rehearsal scripts and linked CI runs.
+
+The five-scenario release fault rehearsal also passed against that exact base
+package on macOS Python 3.13.15. It exercises barrier-released same-file HTTPS
+acceptance, an actual stopped endpoint with offline draft/reconnect and external
+filesystem edits/deletion, delivered-response discard and accepted-operation replay,
+process kill during materialization with post-crash edits, and process kill before
+acceptance commit with a real SQLite spilled rollback journal. Original drafts and
+private sentinels survive; the authority recovers its full prior logical checkpoint.
+Two proposals in the acceptance race use one legitimate worker lease and concurrent
+integrator requests, not two simultaneously authorized owners. Successful acceptance
+retry preserves logical state except its monotonic clock; repeated conflicted
+acceptance may append an audit event. The response-loss probe discards an already
+delivered response and does not claim measured network packet loss. Hooks instrument
+only exact packaged code in disposable children. The new reproducible
+`scripts/rehearse_release_faults.py` is run separately against final release source.
+
+Release preparation exposed an ignored-input packaging gap before publication:
+`.env` or `.DS_Store` inside a skill could enter a general source-built package
+without changing ordinary Git status. The alpha release builder now reads exact
+committed blobs and checks working bytes directly, including hidden index changes.
+The development builder excludes ignored inputs while retaining legitimate new
+work with a dirty label. Regression tests use disposable Git repositories to check
+ignored sentinel exclusion, hidden-change refusal, complete source/provenance/hash
+readback, same-environment repeatability and output preservation. Their completed
+results are recorded with the final release and CI below; no leak was observed.
+
+Final local Python 3.13 validation collected **361 tests: 341 passed and 20
+Windows-only cases skipped**, in 91.993 seconds. The five release-build regressions
+also passed on Python 3.12 and 3.13, including eight hidden-index change combinations;
+23 existing packaged CLI tests passed separately. Source packaging, documentation,
+and isolated fault checks do not establish external-provider or independent-user
+acceptance. Final commit CI and exact asset checks are linked from the prerelease.
+
+Physical Windows onboarding, independent-human operation, actual cloud-storage
+provider receipt/recovery, long-running hosting and production-scale capacity are
+unverified. Local fixture delivery and coordinator transport are separate claims.
+No live production-vault migration has been performed.
+
 ## Requirement audit: selected import and factual conflict routing, 2026-09-08
 
 The post-8b33a8e audit reproduced two further gaps. Packaged `init --include Note.md`
@@ -76,8 +150,9 @@ independent-person and operational deployment acceptance remain open.
 
 ## Repository separation
 
-Shared Memory now has an independent private development repository. Public
-visibility is deferred until version 1 is finished. The source was transferred
+At the repository-separation checkpoint, Shared Memory had an independent private
+development repository and publication was deferred. That visibility policy is
+superseded by the experimental release scope above. The source was transferred
 from commit `c4aaedbbeb959bce8b624efe2c83c91f96c8ee0d` with its history preserved.
 The separation changes repository navigation and documentation, not runtime behavior.
 Historical links below identify runs in the legacy repository and may require access
@@ -368,7 +443,7 @@ actors, not independent humans or real storage-provider delivery.
 
 Terminal run metadata, all six product job logs, all four HTTPS reports, the exact
 package and a verified 61-file source snapshot were captured privately before the
-legacy repository became private. Both repositories are now private. No GitHub
+legacy repository became private. Both repositories were private at that checkpoint. No GitHub
 release or public prerelease was created. The new repository retains source history;
 its own validation remains distinct from these historical runs.
 

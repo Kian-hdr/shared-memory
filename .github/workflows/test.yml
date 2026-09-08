@@ -57,3 +57,36 @@ jobs:
         run: python scripts/rehearse_coordination.py --package "${{ runner.temp }}/shared-memory.pyz" --output "${{ runner.temp }}/coordination-rehearsal"
       - name: Rehearse reviewed selected-folder rename
         run: python scripts/rehearse_graph_rename.py --package "${{ runner.temp }}/shared-memory.pyz" --output "${{ runner.temp }}/graph-rename-rehearsal"
+      - name: Build complete clean-source alpha distribution
+        run: python scripts/build_release.py --output "${{ runner.temp }}/shared-memory-release"
+
+  release-faults:
+    # Real process-kill and SQLite journal fixtures on POSIX. Windows coverage
+    # remains in the product suite; this job does not claim a Windows kill test.
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - run: python -m pip install -r requirements-server.txt
+      - name: Build exact candidate
+        run: python scripts/build_product.py --output "${{ runner.temp }}/shared-memory.pyz"
+      - name: Run isolated packaged fault and recovery checks
+        shell: bash
+        run: |
+          package_hash=$(python -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$RUNNER_TEMP/shared-memory.pyz")
+          python scripts/rehearse_release_faults.py --package "$RUNNER_TEMP/shared-memory.pyz" --sha256 "$package_hash" --output "$RUNNER_TEMP/release-faults"
+      - name: Preserve sanitized fault report only
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-faults-${{ matrix.os }}
+          path: ${{ runner.temp }}/release-faults/report.json
+          if-no-files-found: warn
+          retention-days: 30

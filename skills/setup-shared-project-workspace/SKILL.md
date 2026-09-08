@@ -1,6 +1,6 @@
 ---
 name: setup-shared-project-workspace
-description: Set up, retrofit, or audit an independent Markdown project folder for people and AI agents, with optional Obsidian integration, with ownership, dependencies, handoffs, validation, and a recipient-specific onboarding prompt. Discover the user's actual storage method and local environment; support local-only, Git, shared-folder, and hybrid workflows without requiring a particular account or provider. Do not use merely to manage ordinary tasks in an already configured workspace.
+description: Set up, retrofit, or audit an independent Markdown project folder for people and AI agents, with optional Obsidian integration, ownership, dependencies, handoffs, validation, and a recipient-specific onboarding prompt. Discover the user's actual storage method and local environment; support local-only, Git, shared-folder, and hybrid workflows without requiring a particular account or provider. Do not use merely to manage ordinary tasks in an already configured workspace.
 ---
 
 # Set up a shared project workspace
@@ -14,7 +14,9 @@ Configure the selected project root only. Do not open Obsidian, create/register 
 vault, or modify parent settings merely to set up a project folder. Keep substantive instructions in
 `AGENTS.md`; do not generate parallel explanation files.
 
-The legacy setup and tracker require Python 3.9 or newer and use only its standard library.
+The Shared Memory product requires Python 3.11+; its experimental prerelease is
+`v0.2.0-alpha.1` (runtime version `0.2.0`). The legacy setup and tracker require
+Python 3.9+ and use only its standard library. Select the route before installing dependencies.
 Resolve `scripts/` paths relative to this skill directory, not the target project.
 Run `--help` for the setup or tracker command when its required inputs are unclear.
 For requested computer readiness or full setup, read

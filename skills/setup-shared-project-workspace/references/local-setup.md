@@ -18,9 +18,9 @@ Apply the recipient's existing authorization to the necessary local steps below.
 
 ## Authorization and continuation
 
-The full setup prompt authorizes required local installs, their prerequisites,
-minimal PATH configuration, app launch, and opening the chosen vault. Install missing
-Obsidian only for explicitly requested Obsidian desktop setup, a compatible Python, and only the components needed
+The setup prompt authorizes required local installs, their prerequisites and minimal
+PATH configuration. App launch and opening a vault apply only to explicitly requested
+Obsidian desktop setup. Install a compatible Python and only the components needed
 by the actual access method in [storage-access.md](storage-access.md). Local-only
 work needs no cloud account/client; Git and some sharing methods use different tools.
 If the recipient chooses Homebrew, that choice includes
@@ -84,7 +84,8 @@ the same OS. Do not force incompatible casks or upgrade unrelated packages.
 
 ## Python and other required dependencies
 
-The tracker supports Python 3.9+. For a new installation, choose a currently
+The product requires Python 3.11+; the legacy tracker supports Python 3.9+.
+For a new installation, choose a currently
 maintained stable release from [Python](https://www.python.org/downloads/) or the
 chosen supported package manager, rather than installing the oldest accepted version.
 Use the interpreter actually installed, such as `python3`, `py -3`, or an absolute
@@ -98,9 +99,9 @@ Do not install full development suites or unrelated browsers by default.
 
 ## Install, launch, and open Obsidian
 
-For an Obsidian workspace, install Obsidian if missing, then launch it and open the
-correct vault. Skip it only for an explicitly Markdown-only workflow or when the
-recipient declines it. Use the selected compatible Homebrew route or
+Only when the recipient explicitly requests Obsidian desktop setup, install it if
+missing, launch it and open the selected existing vault. A project merely located
+inside a vault does not request these actions. Use the selected compatible Homebrew route or
 [Obsidian's official downloads](https://obsidian.md/download), following the current
 [installation instructions](https://help.obsidian.md/install).
 
