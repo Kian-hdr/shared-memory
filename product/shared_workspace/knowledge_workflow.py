@@ -1,6 +1,8 @@
 """Read-only selected-folder and accepted-snapshot knowledge graph entry point."""
 from __future__ import annotations
 
+from pathlib import Path
+
 from .errors import ProductError
 from .workflow import connect, json_file, private_path, project_manifest, selected_root
 
@@ -15,8 +17,11 @@ def add_commands(commands):
 
 
 def dispatch(bundle, args):
-    from .knowledge import analyze
+    from .knowledge import analyze, _absolute
     root = selected_root(args.project)
+    # Validate original roots/ancestors before reading notes or private bindings;
+    # selected_root resolves junctions and could otherwise hide the link.
+    _absolute(Path(args.project).expanduser())
     if not args.accepted:
         if args.state_dir:
             raise ProductError(2, 'usage_error', '--state-dir is used only with --accepted; local graph reads the selected folder.')

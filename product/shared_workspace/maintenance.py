@@ -280,7 +280,9 @@ def backup_coordinator(database, destination, expected_project_id=None):
                                          expected_project_id=identity)
             if verified['checkpoint'] != checkpoint['checkpoint']:
                 raise ProductError(5, "backup_invalid", "Backup history differs from the pinned authority; preserve both files.")
-    with destination.open('rb') as stream:
+    # Windows requires a writable handle to flush an existing file. r+b retains
+    # the verified backup bytes and does not truncate or create a missing file.
+    with destination.open("r+b") as stream:
         os.fsync(stream.fileno())
     _fsync_dir(destination.parent)
     return {"backup_sha256": sha(destination), "integrity_check": "ok", "source_changed": False,

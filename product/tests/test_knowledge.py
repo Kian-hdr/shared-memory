@@ -4,10 +4,13 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 PRODUCT = Path(__file__).resolve().parents[1]
@@ -320,6 +323,169 @@ class KnowledgeTests(unittest.TestCase):
         self.assertEqual(snapshot['edges'], filesystem['edges'])
         self.assertEqual(fingerprint(project), before)
         self.assertEqual(analyze(files=dict(reversed(list(files.items())))), snapshot)
+
+    def test_windows_enumeration_zero_identity_uses_fresh_nonfollowing_stat(self):
+        project = self.root / 'project'
+        project.mkdir()
+        note = project / 'Home.md'
+        note.write_bytes(b'# Unchanged note\n')
+        real_scandir = os.scandir
+
+        class WindowsEntry:
+            def __init__(self, entry):
+                self.entry = entry
+            def __getattr__(self, name):
+                return getattr(self.entry, name)
+            def stat(self, *, follow_symlinks=True):
+                info = self.entry.stat(follow_symlinks=follow_symlinks)
+                return SimpleNamespace(st_ino=0, st_dev=0, st_nlink=0,
+                    st_mode=info.st_mode, st_size=info.st_size, st_mtime_ns=info.st_mtime_ns)
+
+        @contextmanager
+        def enumeration(path):
+            with real_scandir(path) as entries:
+                yield (WindowsEntry(entry) for entry in entries)
+
+        with patch.object(knowledge.os, 'scandir', side_effect=enumeration), \
+                patch.object(knowledge.os, 'supports_dir_fd', set()):
+            graph = analyze(root=project)
+        self.assertEqual(nodes(graph)['Home.md']['content_sha256'], hashlib.sha256(note.read_bytes()).hexdigest())
+        self.assertEqual(graph['diagnostics'], [])
+
+    def test_replacement_after_fresh_stat_rejected_even_with_same_size_and_mtime(self):
+        project = self.root / 'project'
+        project.mkdir()
+        note = project / 'Home.md'
+        note.write_bytes(b'# Original\n')
+        replacement = self.root / 'replacement.md'
+        replacement.write_bytes(b'# Replaced\n')
+        original = note.stat()
+        os.utime(replacement, ns=(original.st_atime_ns, original.st_mtime_ns))
+        real_read = knowledge._read_note
+
+        def swap(root, relative, expected):
+            os.replace(replacement, note)
+            return real_read(root, relative, expected)
+
+        with patch.object(knowledge, '_read_note', side_effect=swap), patch.object(knowledge.os, 'read') as read:
+            with self.assertRaises(ProductError) as caught:
+                analyze(root=project)
+        self.assertEqual(caught.exception.code, 'knowledge_changed')
+        read.assert_not_called()
+        self.assertEqual(note.read_bytes(), b'# Replaced\n')
+
+    def test_symlink_swap_after_fresh_stat_never_reads_outside(self):
+        project = self.root / 'project'
+        project.mkdir()
+        note = project / 'Home.md'
+        note.write_bytes(b'# Original\n')
+        outside = self.root / 'private.md'
+        outside.write_bytes(b'PRIVATE OUTSIDE CONTENT')
+        link = self.root / 'replacement-link'
+        try:
+            link.symlink_to(outside)
+        except OSError as exc:
+            self.skipTest(f'Symlink capability unavailable: {exc.errno}')
+        real_read = knowledge._read_note
+
+        def swap(root, relative, expected):
+            os.replace(link, note)
+            return real_read(root, relative, expected)
+
+        with patch.object(knowledge, '_read_note', side_effect=swap), patch.object(knowledge.os, 'read') as read:
+            with self.assertRaises(ProductError) as caught:
+                analyze(root=project)
+        self.assertIn(caught.exception.code, {'knowledge_changed', 'knowledge_read'})
+        read.assert_not_called()
+        self.assertEqual(outside.read_bytes(), b'PRIVATE OUTSIDE CONTENT')
+
+    def test_in_place_mutation_during_descriptor_read_is_rejected(self):
+        project = self.root / 'project'
+        project.mkdir()
+        note = project / 'Home.md'
+        note.write_bytes(b'# Original\n')
+        original = note.stat()
+        real_read = os.read
+        changed = False
+
+        def mutate(fd, count):
+            nonlocal changed
+            chunk = real_read(fd, count)
+            if chunk and not changed:
+                changed = True
+                note.write_bytes(b'# Mutation\n')
+                os.utime(note, ns=(original.st_atime_ns, original.st_mtime_ns + 2_000_000_000))
+            return chunk
+
+        with patch.object(knowledge.os, 'read', side_effect=mutate):
+            with self.assertRaises(ProductError) as caught:
+                analyze(root=project)
+        self.assertTrue(changed)
+        self.assertEqual(caught.exception.code, 'knowledge_changed')
+
+    def test_reparse_attribute_blocks_roots_ancestors_and_entries_without_reads(self):
+        vault = self.root / 'vault'
+        project = vault / 'project'
+        linked = project / 'linked'
+        linked.mkdir(parents=True)
+        (project / 'Home.md').write_bytes(b'[[linked/Outside]]')
+        (linked / 'Outside.md').write_bytes(b'PRIVATE CONTENT')
+        real_lstat = os.lstat
+        flagged = linked
+
+        def reparse(path, *args, **kwargs):
+            info = real_lstat(path, *args, **kwargs)
+            if Path(path) == flagged:
+                return SimpleNamespace(st_mode=info.st_mode, st_file_attributes=0x400)
+            return info
+
+        real_read = knowledge._read_note
+        read_paths = []
+        def read(root, relative, expected):
+            read_paths.append(relative)
+            return real_read(root, relative, expected)
+
+        with patch.object(knowledge.os, 'lstat', side_effect=reparse), \
+                patch.object(knowledge, '_read_note', side_effect=read):
+            graph = analyze(root=project)
+        self.assertEqual(read_paths, ['Home.md'])
+        self.assertEqual(graph['edges'][0]['status'], 'excluded')
+        self.assertIn('reparse_point_omitted', [d['code'] for d in graph['diagnostics']])
+        self.assertNotIn('PRIVATE CONTENT', json.dumps(graph))
+        for flagged in (project, vault):
+            with self.subTest(flagged=flagged.name), patch.object(knowledge.os, 'lstat', side_effect=reparse):
+                with self.assertRaises(ProductError) as caught:
+                    analyze(root=project)
+            self.assertEqual(caught.exception.code, 'knowledge_root')
+
+    @unittest.skipUnless(os.name == 'nt', 'Windows NTFS junction fixture')
+    def test_actual_windows_junction_excluded_and_cannot_be_root_or_ancestor(self):
+        project = self.root / 'project'
+        outside = self.root / 'outside'
+        project.mkdir()
+        outside.mkdir()
+        (project / 'Home.md').write_bytes(b'[[linked/Private]]')
+        private = outside / 'Private.md'
+        private.write_bytes(b'PRIVATE JUNCTION TARGET')
+        (outside / 'nested').mkdir()
+        link = project / 'linked'
+        result = subprocess.run(['cmd', '/d', '/c', 'mklink', '/J', str(link), str(outside)],
+                                capture_output=True, timeout=15)
+        self.assertEqual(result.returncode, 0, 'Windows fixture requires local NTFS junction support')
+        # Remove only this task-owned junction, never its target, before temp cleanup.
+        self.addCleanup(lambda: os.rmdir(link) if os.path.lexists(link) else None)
+        real_read = knowledge._read_note
+        with patch.object(knowledge, '_read_note', wraps=real_read) as read:
+            graph = analyze(root=project)
+        self.assertEqual([call.args[1] for call in read.call_args_list], ['Home.md'])
+        self.assertEqual(set(nodes(graph)), {'Home.md'})
+        self.assertEqual(graph['edges'][0]['status'], 'excluded')
+        self.assertNotIn('PRIVATE JUNCTION TARGET', json.dumps(graph))
+        for root in (link, link / 'nested'):
+            with self.subTest(root=root.name), self.assertRaises(ProductError) as caught:
+                analyze(root=root)
+            self.assertEqual(caught.exception.code, 'knowledge_root')
+        self.assertEqual(private.read_bytes(), b'PRIVATE JUNCTION TARGET')
 
     def test_limits_fail_explicitly_and_unsupported_coverage_is_reported(self):
         for constant, limit, files in [('MAX_FILES', 1, {'One.md': '', 'Two.md': ''}),

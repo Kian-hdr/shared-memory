@@ -26,7 +26,9 @@ Private vault/
 
 The analyzer does not follow links into the parent vault or search its siblings
 to resolve a missing note. Hidden folders, known private runtime/credential paths,
-symlinks and unsupported file formats are excluded. It never changes notes,
+symlinks, Windows junction/reparse entries and unsupported file formats are excluded.
+The selected root and its ancestors must be physical folders, without these links.
+It never changes notes,
 permissions, application settings or coordination policy. Keep coordinator and
 client state outside the entire vault and its synchronization roots, as described
 in the [operating guide](PRODUCT-V1.md).
@@ -242,7 +244,7 @@ and editor rendering are outside the declared coverage.
 
 Local attachment inventory supports PDF, common image/audio/video formats, CSV
 and text files. Only supported linked attachments become nodes, and their content
-is never read. Non-UTF-8 Markdown, unsafe paths, symlinks and private/hidden inputs
+is never read. Non-UTF-8 Markdown, unsafe paths, symlinks/reparse points and private/hidden inputs
 are omitted or refused with the corresponding boundary diagnostics. The graph
 does not infer semantic equivalence, validate claims from prose, or convert notes
 into session credentials, policy or executable instructions.

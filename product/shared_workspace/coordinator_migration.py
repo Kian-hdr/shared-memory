@@ -254,7 +254,9 @@ def _create_backup(source, destination, expected_project_id, checkpoint):
         target.execute("PRAGMA synchronous=FULL")
         source.backup(target, pages=128, progress=progress, sleep=0.05)
     hashed = _verify_backup(destination, expected_project_id, checkpoint)
-    with destination.open("rb") as stream:
+    # Windows requires a writable handle to flush an existing file. r+b retains
+    # the verified backup bytes and does not truncate or create a missing file.
+    with destination.open("r+b") as stream:
         os.fsync(stream.fileno())
     _fsync_directory(destination.parent)
     return hashed

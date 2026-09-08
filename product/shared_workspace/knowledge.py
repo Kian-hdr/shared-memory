@@ -62,6 +62,17 @@ def _private(name):
                for part in name.replace('\\', '/').split('/'))
 
 
+def _link_or_reparse(path):
+    """Do not follow Windows junctions or other reparse entries (Python 3.11+)."""
+    try:
+        info = os.lstat(path)
+    except FileNotFoundError:
+        return False
+    return (stat.S_ISLNK(info.st_mode)
+            or bool(getattr(info, 'st_file_attributes', 0)
+                    & getattr(stat, 'FILE_ATTRIBUTE_REPARSE_POINT', 0x400)))
+
+
 def _absolute(path):
     path = Path(os.path.abspath(path))
     if sys.platform == 'darwin':
@@ -71,8 +82,8 @@ def _absolute(path):
                 path = Path('/private' + alias) / path.relative_to(start)
                 break
     for parent in (path, *path.parents):
-        if parent.is_symlink():
-            _fail('knowledge_root', 'The selected graph root cannot use symlinks.')
+        if _link_or_reparse(parent):
+            _fail('knowledge_root', 'The selected graph root cannot use symlinks or reparse points.')
     if not path.is_dir():
         _fail('knowledge_root', 'Select an existing project folder.')
     return path
@@ -93,7 +104,7 @@ def _read_note(root, relative, expected):
         else:
             path = root / relative
             for part in (path, *path.parents):
-                if part.is_symlink():
+                if _link_or_reparse(part):
                     _fail('knowledge_changed', 'A graph input changed during inspection.')
             fd = os.open(path, os.O_RDONLY | getattr(os, 'O_BINARY', 0))
         handles.append(fd)
@@ -484,7 +495,7 @@ class _Graph:
         while pending:
             relative, directory = pending.pop()
             for ancestor in (directory, *directory.parents):
-                if ancestor.is_symlink():
+                if _link_or_reparse(ancestor):
                     _fail('knowledge_changed', 'A graph directory changed during inspection.')
             try:
                 with os.scandir(directory) as iterator:
@@ -505,8 +516,8 @@ class _Graph:
                     self.excluded.add(name)
                     continue
                 try:
-                    if entry.is_symlink():
-                        self.diagnostic('symlink_omitted', name)
+                    if entry.is_symlink() or _link_or_reparse(entry.path):
+                        self.diagnostic('symlink_omitted' if entry.is_symlink() else 'reparse_point_omitted', name)
                         self.excluded.add(name)
                         continue
                     if entry.is_dir(follow_symlinks=False):
@@ -523,7 +534,13 @@ class _Graph:
                             pending.append((name + '/', Path(entry.path)))
                     elif entry.is_file(follow_symlinks=False):
                         if self.select(name, count=False) and PurePosixPath(name).suffix.casefold() in NOTE_EXTENSIONS:
-                            info = entry.stat(follow_symlinks=False)
+                            # Windows DirEntry.stat caches enumeration metadata with
+                            # zero device/inode fields. Obtain a fresh non-following
+                            # identity comparable with the descriptor's fstat; keep
+                            # every identity/size/time check in _read_note intact.
+                            info = os.stat(entry.path, follow_symlinks=False)
+                            if not stat.S_ISREG(info.st_mode):
+                                _fail('knowledge_changed', 'A graph input changed during inspection.')
                             if info.st_size > MAX_NOTE_BYTES:
                                 _fail('knowledge_limit', 'A note exceeds the graph byte limit.')
                             self.add(name, _read_note(root, name, (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns)))

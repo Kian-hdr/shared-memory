@@ -10,6 +10,35 @@ Historical links below identify runs in the legacy repository and may require ac
 after it becomes private. They are not new-repository CI results. The new repository
 checkpoint below records its own completed validation separately.
 
+## Windows portability correction, 2026-09-08
+
+The extension at `3c8e9e90e78e4b12890e13c1dd42a03a863ecab5` passed ten
+[CI jobs](https://github.com/Kian-hdr/shared-memory/actions/runs/34238239825) but
+failed both Windows product jobs. The graph used directory-entry metadata whose
+Windows file identity did not agree with an opened descriptor, matching the
+[Python directory-entry contract](https://docs.python.org/3.13/library/os.html#os.DirEntry.stat). Backup and schema
+upgrade attempted to flush read-only file descriptors, which Windows rejected.
+That artifact is retained as a withheld development checkpoint.
+
+The correction obtains uncached no-follow path identity before opening graph notes
+and keeps descriptor identity/change checks. Graph traversal also rejects linked
+roots/ancestors and excludes Windows junction/reparse entries, including validation
+of the original CLI path before resolution can hide a junction. Backup flushes use writable,
+nontruncating handles; flushing is still required, and failures still propagate.
+Both local Python 3.13 and 3.12 runs collected **280 tests: 278 passed and
+two real Windows-only junction fixtures were explicitly skipped**. The native-renamed
+synthetic graph still resolves five notes/twelve edges without diagnostics.
+Independent review approved the flush, replacement/mutation and junction boundaries.
+Actual Windows acceptance requires the corrected-source matrix to pass.
+
+The same-source [HTTPS regression](https://github.com/Kian-hdr/shared-memory/actions/runs/34238278569)
+passed all four jobs and **123 packaged CLI calls**. All three OS clients reached
+revision 3 with identical content and preserved private parent/settings/attachment
+bytes. Task-owned processes stopped. The package SHA-256 was
+`0ca9413784f0f77a87c757d4730be629ce90eb6c279015f145553823b3d832de`, identical to
+the independently built/read-back local package. This tests schema-1 compatibility,
+not the new distributed session workflow, provider receipt or independent people.
+
 ## Coordination, graph and upgrade extension, 2026-09-08
 
 The opt-in schema-2 extension passed **273/273 product tests**, with no skips, on

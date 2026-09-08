@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -114,6 +115,40 @@ class KnowledgeCLITests(unittest.TestCase):
         self.assertEqual(output['code'], 'usage_error')
         self.assertFalse(self.state.exists())
         self.assertFalse((self.project / '.shared-memory.json').exists())
+
+    @unittest.skipUnless(os.name == 'nt', 'Windows NTFS junction fixture')
+    def test_actual_windows_junction_root_and_ancestor_rejected_before_local_or_accepted_reads(self):
+        outside = self.root / 'private-outside'; outside.mkdir()
+        (outside / 'nested').mkdir()
+        private = outside / 'nested' / 'Private.md'
+        private.write_bytes(b'# PRIVATE-JUNCTION-TARGET\n')
+        before = fingerprint(outside)
+        link = self.project / 'linked'
+        created = subprocess.run(['cmd', '/d', '/c', 'mklink', '/J', str(link), str(outside)],
+                                 capture_output=True, text=True, timeout=15)
+        self.assertEqual(created.returncode, 0, created.stdout + created.stderr)
+        self.addCleanup(lambda: os.rmdir(link) if link.exists() else None)
+        for selected in (link, link / 'nested'):
+            for accepted in (False, True):
+                with self.subTest(root=selected.name, accepted=accepted):
+                    command = [sys.executable, str(self.archive), 'graph', str(selected)]
+                    if accepted:
+                        command.append('--accepted')
+                    # No state is provided: unsafe input must be rejected before
+                    # private binding reads or the accepted-mode missing-state error.
+                    result = subprocess.run(command, cwd=self.root, capture_output=True,
+                                            text=True, timeout=60)
+                    self.assertEqual(result.returncode, 3, result.stdout + result.stderr)
+                    self.assertEqual(result.stderr, '')
+                    output = json.loads(result.stdout)
+                    self.assertFalse(output['ok'])
+                    self.assertEqual(output['command'], 'graph')
+                    self.assertEqual(output['code'], 'knowledge_root')
+                    self.assertNotIn('nodes', output['data'])
+                    self.assertNotIn('PRIVATE-JUNCTION-TARGET', result.stdout)
+                    self.assertNotIn(str(outside), result.stdout)
+                    self.assertEqual(fingerprint(outside), before)
+                    self.assertFalse(self.state.exists())
 
     def test_selected_root_and_private_state_project_mismatch_is_refused(self):
         self.initialize()
