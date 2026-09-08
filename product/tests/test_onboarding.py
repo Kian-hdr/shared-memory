@@ -158,6 +158,10 @@ class OnboardingTests(unittest.TestCase):
         token = self.root / 'recipient.token'
         self.cli('member-add', self.project, '--state-dir', self.state, '--actor', 'recipient',
                  '--person', 'Recipient', '--agent', 'Own agent', '--token-output', token)
+        # The public token reader accepts platform line endings. Exercise CRLF
+        # on every OS while proving the original issued input is not rewritten.
+        issued = token.read_bytes().strip() + b'\r\n'
+        token.write_bytes(issued)
         recipient = self.root / 'Recipient folder'; recipient.mkdir()
         private = self.root / 'recipient-state'
         attached = self.setup('--database', self.state / 'coordinator.sqlite3', '--token-file', token,
@@ -169,8 +173,9 @@ class OnboardingTests(unittest.TestCase):
         self.assertEqual(attached['provider_delivery'], 'unverified')
         again = self.setup(project=recipient, state=private)
         self.assertEqual(again['route'], 'resume_attach')
-        self.assertEqual((private / 'member.token').read_bytes(), token.read_bytes())
-        self.assertNotEqual(token.read_bytes(), (self.state / 'member.token').read_bytes())
+        self.assertEqual(token.read_bytes(), issued)
+        self.assertEqual((private / 'member.token').read_bytes().strip(), issued.strip())
+        self.assertNotEqual(issued.strip(), (self.state / 'member.token').read_bytes().strip())
         self.assertEqual((recipient / 'Home.md').read_bytes(), (self.project / 'Home.md').read_bytes())
 
     def test_conflicting_explicit_resume_values_never_mutate_saved_setup(self):

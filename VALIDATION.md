@@ -27,6 +27,14 @@ platform-specific cases skipped. An earlier run retained an obsolete expectation
 that credentials were imported; that fixture now verifies the intended exclusion.
 Cross-platform CI executes the frozen source separately before release publication.
 
+The first normal candidate at `5ab2eaf` remained unpublished after both Windows
+jobs found a test-only LF/CRLF comparison in the own-member join fixture. Authenticated
+joining and resuming had succeeded; token reading explicitly accepts surrounding
+whitespace. The corrected test forces CRLF on every OS, verifies unchanged issued
+input and equal normalized membership, and keeps the distinct-owner check. All
+nineteen corrected onboarding cases passed locally; the corrected commit requires
+its own cross-platform CI before publication.
+
 The release includes the versioned `rehearse_team.py` path: normal owner setup,
 missing-connection recovery, actual verified loopback TLS, a separately issued
 member joining with `setup`, accepted revision receipt and handoff, and preservation
