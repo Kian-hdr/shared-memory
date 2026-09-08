@@ -134,7 +134,7 @@ class MaintenanceTests(unittest.TestCase):
         (source / 'Notes' / 'Other.md').write_text('# Other\n')
         (source / 'Home.md').write_text('[[Notes/Other.md]] [[Other#Part|label]] [[Outside]]\n')
         (source / '.obsidian').mkdir(); (source / '.obsidian' / 'private.json').write_text('{"private":true}')
-        for name in ('connection.json', 'client.json', 'snapshot.json', 'journal.json', 'state.json'):
+        for name in ('connection.json', 'client.json', 'snapshot.json', 'journal.json', 'state.json', 'setup-intent.json', '.setup.lock'):
             (source / name).write_text('{"private_fixture":"KEEP-OUT"}')
         (source / 'member.token').write_text('PRIVATE-CREDENTIAL-FIXTURE')
         (source / 'authority.sqlite').write_bytes(b'PRIVATE-DATABASE-FIXTURE')
@@ -158,11 +158,20 @@ class MaintenanceTests(unittest.TestCase):
         (source / 'coordinator-state').mkdir()
         (source / 'coordinator-state' / 'history.json').write_text('{"private":"history"}')
         (source / 'authority.sqlite-wal').write_bytes(b'PRIVATE-WAL-FIXTURE')
+        (source / 'setup-recovery').mkdir()
+        (source / 'setup-recovery' / 'private.md').write_text('PRIVATE-SETUP-RECOVERY-FIXTURE')
         before = inventory(self.root)
         result = maintenance.migration_plan(source, self.root / 'Future')
         self.assertEqual(inventory(self.root), before)
         self.assertEqual(set(result['files']), {'Home.md', 'Notes/Other.md'})
         self.assertEqual(result['external_or_unresolved_wikilinks'], [{'path': 'Home.md', 'target': 'Missing/Other.md'}])
+
+    def test_private_setup_records_cannot_enter_accepted_project_content(self):
+        from shared_workspace.engine import validate_files
+        for name in ('setup-intent.json', 'Nested/setup-intent.json',
+                     'setup-recovery/private.md', '.setup.lock'):
+            with self.subTest(path=name), self.assertRaises(ProductError):
+                validate_files({name: 'PRIVATE-SETUP-FIXTURE'})
 
     def test_migration_rejects_existing_or_nested_destination_without_mutation(self):
         source = self.root / 'Source'; source.mkdir(); (source / 'Home.md').write_text('fixture')

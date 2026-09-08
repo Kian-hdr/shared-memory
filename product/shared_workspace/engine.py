@@ -31,7 +31,8 @@ EVENT_PAGE_BYTES = 4 * 1024 * 1024
 PROTECTED = {".git", ".obsidian", ".workspace-project.json", ".shared-memory.json",
              ".shared-memory", ".shared-workspace", "coordinator.db", "coordinator.sqlite",
              "coordinator.sqlite3", "coordinator-state", "client-state", "client-state.json",
-             "state.json", "client.json", "snapshot.json", "journal.json", ".lock"}
+             "state.json", "client.json", "snapshot.json", "journal.json", ".lock",
+             "setup-intent.json", "setup-recovery", ".setup.lock"}
 READ_OPERATIONS = {"status", "snapshot", "events", "proposal", "conflict", "assignment", "facts"}
 OPERATIONS = READ_OPERATIONS | {"member", "revoke", "claim", "propose", "accept", "resolve",
                                  "reject", "supersede", "handoff", "receive", "complete",

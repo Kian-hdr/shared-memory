@@ -1,5 +1,37 @@
 # Validation record
 
+## Recovery hardening checkpoint, 2026-09-08
+
+A subsequent bounded audit reproduced interrupted first-time setup, a skipped-revision
+directory-to-file recovery failure, and first-import newline normalization. The
+prepared b58ea16 downloadable prerelease was withheld; its successful earlier CI
+and HTTPS run remain historical evidence for that exact source.
+
+The corrected source adds immutable private setup intent and credential preservation,
+atomic authority/manifest publication, bounded setup locking and exact retry binding.
+Invalid owner inputs are rejected before creating private state, and different setup
+identities reserve the selected root before materialization. Initial UTF8 import
+preserves CRLF, LF, lone CR and missing final newline bytes. New setup records are
+excluded from accepted content and migration output.
+
+Directory conversion now processes eligible tracked deletions before writes, including
+when a recipient skips intermediate revisions. Only empty obsolete ancestors required
+for the conversion are removed; modified tracked files and private/untracked descendants
+remain preserved and may block replacement. The stored journal format is unchanged.
+
+**131/131 product tests passed with no skips on macOS/Python 3.13.15 and 3.12.13.**
+New coverage comprises ten setup tests (including fifteen real subprocess hard-exit
+boundaries and deterministic concurrency regressions), fourteen directory-transition
+tests (including injected I/O failure/reopen), and one private-setup exclusion test.
+Existing engine/client/maintenance/CLI tests also passed. Independent focused review
+reproduced the original failures and verified the corrections. These boundaries do
+not certify physical power loss or every filesystem. Setup, installation and directory
+conversion require supported same-filesystem hard links.
+
+The next step is fresh cross-platform CI and the concurrent HTTPS run on the committed
+corrected source. No corrected-package remote pass or downloadable release is implied
+until those runs complete.
+
 ## Published development branch and cross-platform CI, 2026-09-08
 
 The reviewed source is published on
@@ -23,6 +55,38 @@ not counted as passed cases. All six legacy toolkit/demo jobs also passed.
 Actual provider transport, independent recipient operators and same-project
 mixed-OS TEAM-11 remain distinct requirements. Automated hosted OS actors are
 labeled explicitly and do not count as independent human onboarding.
+
+## Concurrent same-project HTTPS evidence, 2026-09-08
+
+[Run 34179509646](https://github.com/Kian-hdr/shared-obsidian-workspace/actions/runs/34179509646)
+passed all four jobs at exact source commit
+`b58ea168f4c18ef16db87dc69b64a454d48673c3`: one Linux coordinator and concurrent
+macOS, Windows and Linux clients. These are automated hosted OS actors with
+synthetic identities, not independent humans or live storage-provider clients.
+
+All four reports agree on project identity, revision **3**, file hash
+`91ebe9250283e0a8834d1e4551264b5742842c5840483af09650b79fc51c7461`,
+and exact package SHA-256
+`993434e0cf3305b717c719e123502cf19fa453f211c88fcdd94285e5d1fffaf2`.
+The package was built once from the clean reviewed source and distributed with a
+signed run/attempt/source rendezvous; clients verified identity and bytes before
+execution. This does not claim byte-identical independent builds across OSes.
+
+The run executed **99 packaged CLI calls**. Three proposals used revision zero;
+the integration owner reviewed exact content, accepted all three and verified
+compatible stale rebases. All clients verified exact materialized UTF8 bytes and
+accepted receipts. The macOS to Windows to Linux handoff completed, and both
+premature writes were rejected. Existing instructions, parent-vault notes, Obsidian
+settings and local binary attachments remained byte-identical. Every report
+records its task-owned processes stopped; the temporary testing tunnel ended.
+
+The [same-commit twelve-job CI](https://github.com/Kian-hdr/shared-obsidian-workspace/actions/runs/34179509594)
+also passed, retaining the 106-case suite and documented platform skips above.
+The HTTPS run uses a temporary testing tunnel, not a persistent production service.
+Provider delivery, independent operator onboarding, provider offline/recovery and
+the rest of TEAM-11 remain open. The fixture is in
+[`scripts/rehearse_distributed.py`](scripts/rehearse_distributed.py), with the
+[bounded workflow](.github/workflows/team-integration.yml).
 
 ## Local pre-upload checkpoint 0.2.0, 2026-09-08
 

@@ -31,9 +31,9 @@ import zipfile
 from pathlib import Path
 
 ROLES = ('macos', 'windows', 'linux')
-INITIAL = {'Home.md': '# Synthetic shared project\n',
+INITIAL = {'Home.md': '# Synthetic shared project\r\n',
            'AGENTS.md': '# Fixture instructions\nPreserve private parent files.\n',
-           'Research.md': 'Public synthetic starting context.\n'}
+           'Research.md': 'Public synthetic context: café 世界.\r\nMixed newline\nLone carriage return\rNo final newline'}
 LIMITS = ['Automated OS actors, not independent humans or AI-agent sessions',
           'No Google Drive, OneDrive, iCloud or storage-provider receipt tested',
           'Temporary tunnel has no availability SLA; not a production deployment',

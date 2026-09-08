@@ -14,7 +14,7 @@ reviewed launch rebrand. Toolkit 1.3.0 and historical CLI 0.1.0 are separate ver
 | --- | --- |
 | Private local tools directory | Verified `.pyz` executable; Python is installed separately |
 | Private local coordinator state | SQLite accepted revisions, membership, assignments, proposals, decisions and event history; never a consumer-sync/network database |
-| Each recipient's private local state | Token, connection settings, received snapshot, offline drafts, backups and recovery journal; never shared with the project |
+| Each recipient's private local state | Token, immutable setup intent, connection settings, received snapshot, offline drafts, backups and recovery journal; never shared with the project |
 | Selected project folder | Human-readable accepted text and `.shared-memory.json` portable identity/protocol/provider metadata |
 | Existing large artifacts | Preserved outside accepted text coverage; use the chosen storage authority and record their links/hashes separately |
 
@@ -45,7 +45,7 @@ permission changes remain their own gates.
 
 Obtain a specific reviewed package and its expected SHA-256 from the approved
 source. A package's self-reported hashes do not authenticate its publisher. This
-candidate may be unpublished; public main must not be substituted silently.
+development source is published on the development branch; public main remains the historical toolkit and must not be substituted silently.
 
 Verify the downloaded bytes without executing the package. Compare against the
 external SHA-256 supplied through the approved source; stop on a mismatch:
@@ -90,6 +90,20 @@ explicit UTF8 files. Existing instructions/home are preserved; missing ones are
 created. Legacy `Coordination/` or `.workspace-project.json` causes a refusal and
 requires reviewed migration, rather than silent replacement.
 
+If `init` or `attach` is interrupted, rerun the original command with the same
+selected folder, private state and setup arguments. The private setup intent retains
+the original credential, identity and source snapshot before authority creation or
+materialization. A retry verifies that binding and resumes the existing journal;
+it does not recreate accepted history or replace a different connection. Keep the
+original recipient token file available for an interrupted attach retry. Changed
+inputs or unrelated private state are rejected. Once setup finishes, use `refresh`
+for ordinary work. Never share `setup-intent.json`, tokens or `setup-recovery/`.
+
+Setup and exact-package installation require local filesystem support for atomic
+same-directory hard-link publication. Unsupported filesystems fail without
+replacing existing target files. This capability still needs validation on each
+chosen provider folder/client; core OS CI does not establish provider compatibility.
+
 The old `create/join/doctor/status/work/teammate-prompt` commands remain the advisory
 tracker compatibility interface. Use `init/attach/refresh/team-status` for the new
 authoritative workflow. Do not confuse their guarantees.
@@ -106,8 +120,10 @@ python PACKAGE.pyz serve --database PRIVATE_STATE/coordinator.sqlite3 --host HOS
 
 Non-loopback serving requires TLS. Certificate/hostname verification stays enabled;
 redirects and environment proxies cannot forward bearer tokens elsewhere. Serving
-uses Uvicorn; the actual packaged server has local TLS rehearsal evidence, not a
-verified Internet deployment, hosting SLA or unattended service installation.
+uses Uvicorn. The packaged server has local TLS evidence and a successful
+concurrent Windows/macOS/Linux HTTPS rehearsal through a temporary testing tunnel.
+That completed fixture is not a persistent hosting service, availability SLA or
+unattended deployment.
 
 An owner explicitly adds a member and saves their credential privately:
 
@@ -131,8 +147,9 @@ Use the actual provider selected for this folder. Omitting `--provider` means
 A private CA can be supplied with `--ca-file`. `--database` is for same-machine
 local tests/operation only; do not point it at a shared/network SQLite file. Joining
 checks project identity and membership before materialization, and preserves local
-conflicting bytes as drafts. `refresh` resumes an existing client; `attach` never
-overwrites an existing private connection.
+conflicting bytes as drafts. `refresh` resumes an existing client; an interrupted
+`attach` can be retried with its original arguments and immutable setup intent.
+It never overwrites a different private connection.
 
 ## Daily agent workflow
 
@@ -198,6 +215,14 @@ Filesystems cannot atomically replace a whole project. A private durable journal
 and immutable backups recover interrupted materialization; mixed files report
 partial receipt. Divergent accepted deletions preserve local bytes. Untracked binary/
 large attachments stay untouched and are listed outside accepted-text coverage.
+
+For a directory-to-file conversion, first accept deletion of its tracked files,
+then accept the replacement file as a separate revision. One proposal containing
+both parent-file and child-deletion paths is conservatively rejected. Recipients
+may catch up over both revisions in one refresh. The client performs eligible
+tracked deletions before writes and removes only empty obsolete directories needed
+for that replacement. Modified tracked children and private/untracked descendants
+are preserved and can block the conversion until deliberately reconciled.
 
 `recover-coordinator --database PRIVATE_DB` recovers a killed writer's SQLite hot
 journal and validates accepted history. The server runs this at startup. Read-only

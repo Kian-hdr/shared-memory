@@ -121,6 +121,46 @@ def _atomic(path, data):
             os.unlink(temporary)
 
 
+def _empty_directory(path, expected=None):
+    """Verify the exact empty directory selected for a journaled file write."""
+    _no_symlinks(path)
+    info = path.lstat()
+    identity = (info.st_dev, info.st_ino)
+    if not stat.S_ISDIR(info.st_mode) or (expected is not None and identity != expected):
+        _error('unsafe_path', 'Directory changed during materialization: ' + str(path))
+    if any(path.iterdir()):
+        _error('unsafe_path', 'A nonempty directory blocks the accepted file; preserve its descendants: ' + str(path))
+    return identity
+
+
+def _replace_empty_directory(path, data, identity):
+    """Remove only an empty directory, then install without replacing a racer.
+
+    The caller has already durably saved its write journal. A crash after rmdir
+    leaves an absent target that normal journal recovery can materialize. A crash
+    after link leaves the complete file. Exclusive link creation refuses any file,
+    directory or symlink another writer creates after rmdir; no recursive cleanup
+    or check-then-overwrite is allowed for this conversion.
+    """
+    _empty_directory(path, identity)
+    fd, temporary = tempfile.mkstemp(prefix='.shared-memory-write-', dir=path.parent)
+    try:
+        with os.fdopen(fd, 'wb') as stream:
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        _empty_directory(path, identity)
+        path.rmdir()  # The filesystem rejects a concurrently added descendant.
+        _fsync_dir(path.parent)
+        _no_symlinks(path)
+        _no_symlinks(temporary)
+        os.link(temporary, path)  # Atomic no-replace installation on this filesystem.
+        _fsync_dir(path.parent)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
 def _io_errors(method):
     @functools.wraps(method)
     def wrapped(*args, **kwargs):
@@ -329,6 +369,35 @@ class Client:
             self._target(name)
             _atomic(path, text.encode('utf-8'))
 
+    def _prune_conversion_ancestors(self, base, target):
+        """Prune only empty tracked-path ancestors needed for a file conversion.
+
+        Ordinary deletions still leave their directories alone. Untracked empty
+        siblings, nonempty/private descendants and divergent tracked children
+        remain in place and therefore block the parent directory's replacement.
+        """
+        removed = set(base['files']) - set(target['files'])
+        obsolete = set()
+        for name in target['files']:
+            if not self._target(name).is_dir():
+                continue
+            prefix = name + '/'
+            for deleted in removed:
+                if not deleted.startswith(prefix):
+                    continue
+                ancestor = deleted.rsplit('/', 1)[0]
+                while ancestor != name:
+                    obsolete.add(ancestor)
+                    ancestor = ancestor.rsplit('/', 1)[0]
+        for name in sorted(obsolete, key=lambda value: (-value.count('/'), value)):
+            path = self._target(name)
+            if not path.is_dir() or any(path.iterdir()):
+                continue
+            identity = _empty_directory(path)
+            _empty_directory(path, identity)
+            path.rmdir()  # Never recursive; a concurrently added child blocks it.
+            _fsync_dir(path.parent)
+
     def _resume(self, recovering=True):
         journal = self._load('journal.json', optional=True)
         if journal is None:
@@ -362,9 +431,24 @@ class Client:
             # from a write that never ran. Retain the whole interrupted state as
             # an additional reviewed draft, including deletion of a new file.
             drafts += self._preserve(target, current, 'interrupted-materialization-observed-state')
-        for name in journal['paths']:
+        # The durable plan remains canonical/sorted, but a recipient may skip
+        # intermediate revisions. Delete baseline-matching tracked children before
+        # trying to replace their former ancestor with accepted text.
+        deletions = [name for name in journal['paths'] if name not in target['files']]
+        writes = [name for name in journal['paths'] if name in target['files']]
+        pruned = False
+        for name in deletions + writes:
+            if name in target['files'] and not pruned:
+                self._prune_conversion_ancestors(base, target)
+                pruned = True
             path = self._target(name)
             desired = target['files'].get(name)
+            if desired is not None and path.is_dir():
+                # Empty directories are not accepted text or user file bytes.
+                # Convert only this target, under the existing recovery journal.
+                identity = _empty_directory(path)
+                _replace_empty_directory(path, desired.encode('utf-8'), identity)
+                continue
             actual = self._read(name)
             if actual == desired:
                 continue

@@ -188,9 +188,11 @@ have executable local acceptance coverage. The full product suite passed 105 tes
 on macOS/Python 3.13 and 3.12 before publication. The subsequent 106-case
 product suite and toolkit demos passed the twelve-job Windows/macOS/Ubuntu CI
 matrix at commit 9214375, with explicit platform-specific skips in the validation
-record. Actual Uvicorn TLS serving passed a 16-command local rehearsal. These establish bounded local contract behavior, not complete TEAM
-acceptance: independent live recipients, provider delivery and mixed-OS TEAM-11
-remain unverified. See [validation](../VALIDATION.md).
+record. Actual Uvicorn TLS serving passed a 16-command local rehearsal. A subsequent
+99-command HTTPS run at b58ea16 passed with concurrent macOS, Windows and Linux
+clients on one project, exact shared package/revision/hash, preserved private files
+and accepted handoffs. This is automated hosted-runner evidence. Independent live
+recipients, provider delivery and complete TEAM-11 remain unverified. See [validation](../VALIDATION.md).
 
 | ID | Scenario and observable acceptance |
 | --- | --- |

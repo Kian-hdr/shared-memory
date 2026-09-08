@@ -2,10 +2,15 @@
 from __future__ import annotations
 
 import hashlib
+import contextlib
+from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
 import secrets
+import sqlite3
+import tempfile
+import time
 import uuid
 
 from . import PRODUCT_VERSION
@@ -137,7 +142,7 @@ def initial_files(root, includes):
             raise ProductError(3, "target_invalid", "Included files cannot use symbolic links.")
         if not path.is_file() or path.stat().st_size > 10 * 1024 * 1024:
             raise ProductError(3, "target_invalid", "Included files must be regular UTF8 files no larger than 10 MiB.")
-        files[relative.as_posix()] = path.read_text(encoding="utf-8")
+        files[relative.as_posix()] = path.read_bytes().decode("utf-8")
     return files
 
 
@@ -158,10 +163,13 @@ def write_manifest(root, project_id, provider):
         if current["project_id"] != project_id or current["provider"] != provider:
             raise ProductError(3, "project_mismatch", "Existing project identity/provider cannot be replaced while joining.")
         return current
-    with path.open("x", encoding="utf-8") as stream:
-        stream.write(json.dumps(metadata, indent=2) + "\n")
-        stream.flush()
-        os.fsync(stream.fileno())
+    try:
+        _publish_setup_json(path, metadata)
+    except FileExistsError:
+        current = project_manifest(root)
+        if current["project_id"] != project_id or current["provider"] != provider:
+            raise ProductError(3, "project_mismatch", "Another setup reserved this selected folder for a different project.")
+        return current
     return metadata
 
 
@@ -176,6 +184,295 @@ def connect(state):
     raise ProductError(3, "connection_invalid", "Unknown coordinator transport.")
 
 
+# Setup intent contains the original credential and source snapshot. It is private,
+# immutable, hash checked, and never copied into the shared project or CLI output.
+SETUP_INTENT = "setup-intent.json"
+SETUP_LOCK = ".setup.lock"
+SETUP_LOCK_MAGIC = b"SharedMemorySetupLock1\n"
+
+
+def _setup_digest(value):
+    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"),
+                                    ensure_ascii=False, allow_nan=False).encode("utf-8")).hexdigest()
+
+
+def _publish_setup_bytes(path, data):
+    """Durably publish a complete new file without replacing an existing one."""
+    from .client import _fsync_dir
+    path = Path(path)
+    if path.is_symlink():
+        raise ProductError(3, "setup_invalid", "Setup cannot replace a symbolic link.")
+    fd, temporary = tempfile.mkstemp(prefix=".setup-write-", dir=path.parent)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.link(temporary, path)
+        _fsync_dir(path.parent)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+        _fsync_dir(path.parent)
+
+
+def _publish_setup_json(path, value):
+    _publish_setup_bytes(path, (json.dumps(value, sort_keys=True, ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
+
+
+@contextmanager
+def _setup_lock(state):
+    """OS lock survives no process; competing setup waits at most five seconds."""
+    from .client import _fsync_dir
+    state.mkdir(mode=0o700, parents=True, exist_ok=True)
+    path = private_path(state / SETUP_LOCK)
+    # Publish complete immutable magic before the inode can be opened/locked.
+    # No contender writes through a descriptor based on a stale empty-file stat.
+    if not path.exists():
+        try:
+            _publish_setup_bytes(path, SETUP_LOCK_MAGIC)
+        except FileExistsError:
+            pass  # Another contender atomically published the same lock first.
+    descriptor = os.open(path, os.O_RDWR | getattr(os, "O_NOFOLLOW", 0))
+    with os.fdopen(descriptor, "r+b") as stream:
+        deadline = time.monotonic() + 5
+        acquired = False
+        while not acquired:
+            try:
+                if os.name == "nt":
+                    import msvcrt
+                    stream.seek(0)
+                    msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
+                else:
+                    import fcntl
+                    fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                acquired = True
+            except OSError:
+                if time.monotonic() >= deadline:
+                    raise ProductError(4, "setup_busy", "Another setup operation owns this private state; retry after it finishes.")
+                time.sleep(0.05)
+        try:
+            stream.seek(0)
+            magic = stream.read()
+            if magic != SETUP_LOCK_MAGIC:
+                raise ProductError(3, "setup_invalid", "Existing lock does not belong to Shared Memory setup.")
+            yield
+        finally:
+            if os.name == "nt":
+                stream.seek(0)
+                msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
+
+
+def _setup_binding(root, args):
+    binding = {"command": args.command, "project_root": str(root), "provider": args.provider}
+    if args.command == "init":
+        binding.update(mode=args.mode, person=args.person, actor=args.actor, agent=args.agent,
+                       purpose=args.purpose, include=args.include)
+    else:
+        binding.update(project_id=args.expected_project_id, token_file=str(private_path(args.token_file, root)),
+                       database=str(private_path(args.database, root)) if args.database else None,
+                       endpoint=args.endpoint, ca_file=str(private_path(args.ca_file)) if args.ca_file else None)
+    return binding
+
+
+def _setup_connection(binding, state):
+    if binding["command"] == "init":
+        return {"protocol": 1, "transport": "local", "database": str(state / "coordinator.sqlite3"), "mode": binding["mode"]}
+    if binding["database"]:
+        return {"protocol": 1, "transport": "local", "database": binding["database"], "mode": "team"}
+    return {"protocol": 1, "transport": "https", "endpoint": binding["endpoint"], "ca_file": binding["ca_file"], "mode": "team"}
+
+
+def _setup_transport(connection, token_file):
+    if connection["transport"] == "local":
+        return LocalTransport(connection["database"], token_file)
+    return HTTPTransport(connection["endpoint"], token_file, connection.get("ca_file"))
+
+
+def _check_setup_state(root, state, intent, binding):
+    from .client import _snapshot
+    unsigned = {k: v for k, v in intent.items() if k != "intent_hash"}
+    if (intent.get("schema_version") != 1 or intent.get("intent_hash") != _setup_digest(unsigned)
+            or intent.get("binding") != binding):
+        raise ProductError(3, "setup_mismatch", "Setup intent is invalid or inputs changed; preserve state and retry the original setup inputs.")
+    _snapshot(intent["snapshot"], intent["project_id"])
+    token = intent["token"]
+    if not isinstance(token, str) or not 32 <= len(token) <= 512 or any(c.isspace() for c in token):
+        raise ProductError(3, "setup_invalid", "Private setup credential is invalid.")
+    if binding["command"] == "attach" and read_token(binding["token_file"]) != token:
+        raise ProductError(3, "setup_mismatch", "Joining credential changed; setup will not replace its original membership.")
+    for name in (".workspace-project.json", "Coordination"):
+        if (root / name).exists() or (root / name).is_symlink():
+            raise ProductError(4, "already_configured", "Legacy state requires reviewed migration; setup cannot take it over.")
+    if (root / MANIFEST).exists() or (root / MANIFEST).is_symlink():
+        metadata = project_manifest(root)
+        if metadata["project_id"] != intent["project_id"] or metadata["provider"] != binding["provider"]:
+            raise ProductError(3, "project_mismatch", "Existing folder identity differs from this setup intent.")
+    token_path = private_path(state / "member.token")
+    if token_path.exists() and read_token(token_path) != token:
+        raise ProductError(3, "setup_mismatch", "Existing credential differs; setup will not replace it.")
+    connection_path = private_path(state / "connection.json")
+    if connection_path.exists() and json_file(connection_path) != _setup_connection(binding, state):
+        raise ProductError(3, "setup_mismatch", "Existing connection differs; setup will not redirect it.")
+    client_config = private_path(state / "client" / "client.json")
+    if client_config.exists():
+        config = json_file(client_config)
+        if config.get("project_id") != intent["project_id"] or config.get("project_root") != str(root):
+            raise ProductError(3, "setup_mismatch", "Existing client belongs to a different project or local folder.")
+
+
+def _initial_authority(state, intent):
+    """Build revision zero privately, then publish it atomically exactly once."""
+    from .client import _fsync_dir
+    from .engine import Coordinator
+    final = private_path(state / "coordinator.sqlite3")
+    staging = private_path(state / (".setup-authority-" + intent["project_id"] + ".sqlite3"))
+    token, snapshot = intent["token"], intent["snapshot"]
+    binding = intent["binding"]
+
+    def verify(path):
+        authority = Coordinator(path)
+        observed = authority.request(token, "snapshot", {"revision": 0})
+        if observed != snapshot:
+            raise ProductError(3, "setup_mismatch", "Existing authority has a different original identity or snapshot.")
+        # Authentication ties the original token to its owner. Revoked/changed
+        # credentials fail instead of silently regenerating membership.
+        return authority
+
+    if final.exists():
+        verify(final)
+        return
+    if staging.exists():
+        try:
+            verify(staging)
+        except ProductError:
+            # An interrupted initial SQLite transaction has no committed tables.
+            # Recover only the task-owned staging path, preserve its blank result,
+            # and never reset a database containing any committed schema/history.
+            with contextlib.closing(sqlite3.connect(staging)) as connection:
+                tables = connection.execute("SELECT name FROM sqlite_master").fetchall()
+                version = connection.execute("PRAGMA user_version").fetchone()[0]
+            if tables or version:
+                raise
+            recovery = private_path(state / "setup-recovery")
+            recovery.mkdir(mode=0o700, exist_ok=True)
+            destination = recovery / (uuid.uuid4().hex + ".sqlite3")
+            os.rename(staging, destination)
+            _fsync_dir(state)
+            _fsync_dir(recovery)
+    if not staging.exists():
+        Coordinator(staging).initialize(intent["project_id"],
+            {"actor": binding["actor"], "human": binding["person"], "agent": binding["agent"]}, token, snapshot["files"])
+    verify(staging)
+    os.link(staging, final)
+    _fsync_dir(state)
+    # The final hardlink remains if interrupted immediately before cleanup.
+    staging.unlink()
+    _fsync_dir(state)
+
+
+def _setup(root, state, args):
+    from .client import Client, _snapshot
+    from .engine import files_hash, validate_files, identifier, text
+    if args.command == "init":
+        # Reject uncorrectable owner/intent values before publishing an immutable
+        # setup record or creating any private state.
+        identifier(args.actor, "actor")
+        text(args.person, "human")
+        text(args.agent, "agent")
+        text(args.purpose, "purpose")
+    binding = _setup_binding(root, args)
+    # Reject a wrong remote/project identity before creating even a private lock.
+    # Resume paths still validate their immutable intent under the lock below.
+    if not (state / SETUP_INTENT).exists():
+        if state.exists() and any(p.name != SETUP_LOCK and not p.name.startswith(".setup-write-") for p in state.iterdir()):
+            raise ProductError(4, "state_exists", "Existing private state has no matching setup intent; preserve its existing workflow.")
+        if any((root / name).exists() or (root / name).is_symlink() for name in (".workspace-project.json", "Coordination")):
+            raise ProductError(4, "already_configured", "Legacy project state requires a reviewed migration.")
+        if args.command == "init":
+            if (root / MANIFEST).exists() or (root / MANIFEST).is_symlink():
+                raise ProductError(4, "already_configured", "Existing project cannot be initialized by a new setup intent.")
+        else:
+            if (root / MANIFEST).exists() or (root / MANIFEST).is_symlink():
+                metadata = project_manifest(root)
+                if metadata["project_id"] != args.expected_project_id or metadata["provider"] != args.provider:
+                    raise ProductError(3, "project_mismatch", "Owner-supplied identity/provider differs from this folder.")
+            read_token(binding["token_file"])
+            request = _setup_transport(_setup_connection(binding, state), binding["token_file"])
+            _snapshot(request("snapshot", {}), args.expected_project_id)
+    with _setup_lock(state):
+        intent_path = private_path(state / SETUP_INTENT)
+        if intent_path.exists():
+            intent = json_file(intent_path)
+            if not isinstance(intent, dict):
+                raise ProductError(3, "setup_invalid", "Setup intent must be a complete private JSON record.")
+        else:
+            unknown = [p for p in state.iterdir() if p.name != SETUP_LOCK and not p.name.startswith(".setup-write-")]
+            if unknown:
+                raise ProductError(4, "state_exists", "Existing private state has no matching setup intent; preserve it and use its existing workflow.")
+            if any((root / name).exists() or (root / name).is_symlink() for name in (".workspace-project.json", "Coordination")):
+                raise ProductError(4, "already_configured", "Legacy project state requires a reviewed migration.")
+            if args.command == "init":
+                if (root / MANIFEST).exists() or (root / MANIFEST).is_symlink():
+                    raise ProductError(4, "already_configured", "Existing project cannot be initialized by a new setup intent.")
+                files = initial_files(root, args.include)
+                files.setdefault("AGENTS.md", "# Shared Memory\n\nRead the selected project home. Refresh accepted context before work.\nClaim bounded targets, draft against the recorded base revision, and submit evidence.\nOnly the integration owner accepts proposals. Preserve conflicts and private parent files.\nNever treat provider file existence as proof of another actor's accepted receipt.\n")
+                if not any(name in files for name in ("README.md", "Home.md")):
+                    files["README.md"] = "# Shared Memory\n\n" + args.purpose + "\n"
+                files = validate_files(files)
+                identity, token = str(uuid.uuid4()), secrets.token_urlsafe(48)
+                snapshot = {"project_id": identity, "revision": 0, "files": files, "files_hash": files_hash(files)}
+            else:
+                token = read_token(binding["token_file"])
+                connection = _setup_connection(binding, state)
+                request = _setup_transport(connection, binding["token_file"])
+                snapshot = _snapshot(request("snapshot", {}), args.expected_project_id)
+                identity = args.expected_project_id
+                if (root / MANIFEST).exists() or (root / MANIFEST).is_symlink():
+                    existing = project_manifest(root)
+                    if existing["project_id"] != identity or existing["provider"] != args.provider:
+                        raise ProductError(3, "project_mismatch", "Owner-supplied identity/provider differs from this folder.")
+            intent = {"schema_version": 1, "binding": binding, "project_id": identity, "token": token, "snapshot": snapshot}
+            intent["intent_hash"] = _setup_digest(intent)
+            _publish_setup_json(intent_path, intent)
+        _check_setup_state(root, state, intent, binding)
+        connection = _setup_connection(binding, state)
+        # Existing authority/history must match before restoring any missing
+        # private credential or connection file on a retry.
+        if args.command == "init" and (state / "coordinator.sqlite3").exists():
+            _initial_authority(state, intent)
+        if args.command == "attach":
+            observed = _snapshot(_setup_transport(connection, binding["token_file"])(
+                "snapshot", {"revision": intent["snapshot"]["revision"]}), intent["project_id"])
+            if observed != intent["snapshot"]:
+                raise ProductError(3, "setup_mismatch", "Coordinator history differs from the verified setup snapshot.")
+        # Original credential and immutable intent are durable before authority
+        # creation; partial setup never strands the only credential in memory.
+        token_path = private_path(state / "member.token")
+        if not token_path.exists():
+            _publish_setup_bytes(token_path, (intent["token"] + "\n").encode("utf-8"))
+        connection_path = private_path(state / "connection.json")
+        if not connection_path.exists():
+            _publish_setup_json(connection_path, connection)
+        if args.command == "init":
+            _initial_authority(state, intent)
+        request = _setup_transport(connection, token_path)
+        original = _snapshot(request("snapshot", {"revision": intent["snapshot"]["revision"]}), intent["project_id"])
+        if original != intent["snapshot"]:
+            raise ProductError(3, "setup_mismatch", "Coordinator history differs from the verified setup snapshot.")
+        # Reserve this exact root identity before materialization. Separate state
+        # directories cannot initialize different identities into the same root.
+        write_manifest(root, intent["project_id"], args.provider)
+        receipt = Client(root, state / "client", request).attach(intent["project_id"])
+        if args.command == "init":
+            return {"project_id": intent["project_id"], "receipt": receipt, "mode": args.mode, "provider": capabilities(args.provider),
+                    "readiness": receipt["readiness"] if args.mode == "local" and args.provider == "local" else "partial",
+                    "coordinator_deployment": "same_machine_only", "next": "Claim an assignment before drafting changes."}
+        return {"receipt": receipt, "readiness": "partial", "provider_receipt": "unverified", "coordinator_membership": "verified"}
+
+
 def dispatch(bundle, args):
     from .client import Client
     from .engine import Coordinator
@@ -186,52 +483,8 @@ def dispatch(bundle, args):
         return {"server": "stopped"}
     root = selected_root(args.project)
     state = private_path(args.state_dir, root)
-    if args.command == "init":
-        if any((root / name).exists() or (root / name).is_symlink() for name in (MANIFEST, ".workspace-project.json", "Coordination")):
-            raise ProductError(4, "already_configured", "Existing project or legacy tracker requires a reviewed join/migration plan.")
-        if state.exists() and any(state.iterdir()):
-            raise ProductError(4, "state_exists", "Preserve existing private state; use the existing connection or choose a fresh state directory.")
-        files = initial_files(root, args.include)
-        files.setdefault("AGENTS.md", "# Shared Memory\n\nRead the selected project home. Refresh accepted context before work.\nClaim bounded targets, draft against the recorded base revision, and submit evidence.\nOnly the integration owner accepts proposals. Preserve conflicts and private parent files.\nNever treat provider file existence as proof of another actor's accepted receipt.\n")
-        if not any(name in files for name in ("README.md", "Home.md")):
-            files["README.md"] = "# Shared Memory\n\n" + args.purpose + "\n"
-        state.mkdir(mode=0o700, parents=True, exist_ok=True)
-        token = secrets.token_urlsafe(48)
-        identifier = str(uuid.uuid4())
-        Coordinator(state / "coordinator.sqlite3").initialize(identifier,
-            {"actor": args.actor, "human": args.person, "agent": args.agent}, token, files)
-        write_private(state / "member.token", token + "\n")
-        config = {"protocol": 1, "transport": "local", "database": str(state / "coordinator.sqlite3"), "mode": args.mode}
-        write_private(state / "connection.json", json.dumps(config, indent=2) + "\n")
-        result = Client(root, state / "client", connect(state)).attach(identifier)
-        write_manifest(root, identifier, args.provider)
-        return {"project_id": identifier, "receipt": result, "mode": args.mode, "provider": capabilities(args.provider),
-                "readiness": result["readiness"] if args.mode == "local" and args.provider == "local" else "partial",
-                "coordinator_deployment": "same_machine_only", "next": "Claim an assignment before drafting changes."}
-    if args.command == "attach":
-        if (root / MANIFEST).exists():
-            metadata = project_manifest(root)
-            if metadata["project_id"] != args.expected_project_id or metadata["provider"] != args.provider:
-                raise ProductError(3, "project_mismatch", "Owner-supplied project/provider does not match this folder.")
-        if state.exists() and any(state.iterdir()):
-            raise ProductError(4, "state_exists", "Existing client state must be resumed with refresh, not overwritten.")
-        token = read_token(private_path(args.token_file, root))
-        if args.database:
-            database = private_path(args.database, root)
-            request = LocalTransport(database, args.token_file)
-            config = {"protocol": 1, "transport": "local", "database": str(database), "mode": "team"}
-        else:
-            request = HTTPTransport(args.endpoint, args.token_file, args.ca_file)
-            config = {"protocol": 1, "transport": "https", "endpoint": args.endpoint, "ca_file": args.ca_file, "mode": "team"}
-        observed = request("snapshot", {})
-        if observed["project_id"] != args.expected_project_id:
-            raise ProductError(3, "project_mismatch", "The coordinator serves a different project.")
-        state.mkdir(mode=0o700, parents=True, exist_ok=True)
-        write_private(state / "member.token", token + "\n")
-        write_private(state / "connection.json", json.dumps(config, indent=2) + "\n")
-        receipt = Client(root, state / "client", connect(state)).attach(args.expected_project_id)
-        write_manifest(root, args.expected_project_id, args.provider)
-        return {"receipt": receipt, "readiness": "partial", "provider_receipt": "unverified", "coordinator_membership": "verified"}
+    if args.command in {"init", "attach"}:
+        return _setup(root, state, args)
     metadata = project_manifest(root)
     transport = connect(state)
     config = json_file(state / "client/client.json")
