@@ -725,6 +725,54 @@ class CoordinationTests(unittest.TestCase):
         with closing(sqlite3.connect(self.database)) as connection:
             return connection.execute('SELECT id,request_json,request_hash FROM proposals ORDER BY id').fetchall()
 
+    def test_semantic_conflict_routes_durable_notice_to_distinct_responsible_owner_atomically(self):
+        unrelated_token = secrets.token_urlsafe(32)
+        self.call('member', {'actor': 'unrelated', 'human': 'Fixture', 'agent': 'Fixture',
+                            'role': 'owner', 'token': unrelated_token}, root=True)
+        self.plan('semantic', integration='worker')
+        self.acquire('semantic')
+        for identity, value in [('initial-fact', 'one'), ('disputed-fact', 'two')]:
+            proposal = self.propose_payload('semantic', identity)
+            proposal['claims'] = [{'key': 'fixture-policy', 'value': value,
+                'source': 'Explicit fixture evidence', 'authority': 'owner'}]
+            self.call('propose', proposal, session='worker-run')
+            if identity == 'initial-fact':
+                self.call('accept', self.accept_payload('semantic', identity, session='worker-run'), session='worker-run')
+        cursors = {actor: self.call('inbox', session=actor + '-run')['next_after_seq']
+                   for actor in ('owner', 'worker')}
+        before = self.checkpoint()
+        accepted_before = self.snapshot()
+        payload = self.accept_payload('semantic', 'disputed-fact', session='worker-run')
+        original_notify = coordination.Coordination.notify
+
+        def fail_after_notice(handler, *args, **kwargs):
+            original_notify(handler, *args, **kwargs)
+            raise OSError('Injected failure after notices were persisted in the transaction')
+
+        with patch.object(coordination.Coordination, 'notify', fail_after_notice):
+            self.reject_unchanged('accept', payload, session='worker-run')
+        self.assertEqual(self.checkpoint(), before)
+        result = self.call('accept', payload, session='worker-run')
+        self.assertFalse(result['accepted'])
+        self.assertEqual(self.snapshot(), accepted_before)
+        self.engine = Coordinator(self.database)
+        for actor in ('owner', 'worker'):
+            page = self.call('inbox', {'after_seq': cursors[actor]}, session=actor + '-run')
+            self.assertEqual(len(page['messages']), 1, actor)
+            notice = page['messages'][0]
+            self.assertEqual(notice['kind'], 'proposal-accept')
+            self.assertEqual(notice['data'], {'proposal_id': 'disputed-fact', 'status': 'conflict',
+                'conflict_ids': [item['conflict_id'] for item in result['conflicts']]})
+            conflict = self.call('conflict', {'conflict_id': notice['data']['conflict_ids'][0]}, session=actor + '-run')
+            self.assertEqual(conflict['responsible_owner'], 'owner')
+            acknowledgement = {'message_id': notice['message_id']}
+            self.call('ack', acknowledgement, session=actor + '-run')
+            acknowledged = (self.call('inbox', session=actor + '-run'), self.call('events', root=True))
+            self.call('ack', acknowledgement, session=actor + '-run')
+            self.assertEqual((self.call('inbox', session=actor + '-run'), self.call('events', root=True)), acknowledged)
+        self.assertEqual(self.engine.request(unrelated_token, 'inbox', {})['messages'], [])
+        self.assertEqual(self.snapshot(), accepted_before)
+
     def test_scoped_responsible_owner_resolves_then_contributor_integrates_semantic_conflict(self):
         resolution = self.semantic_conflict()
         original = self.request_bytes()

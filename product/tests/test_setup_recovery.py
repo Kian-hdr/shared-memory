@@ -155,6 +155,101 @@ class SetupRecoveryTests(unittest.TestCase):
                 self.assertNotIn(token, path.read_bytes(), path.name)
         self.assertEqual((project.parent / 'Private.md').read_bytes(), b'PRIVATE-PARENT-PRESERVED\n')
 
+    def test_explicit_include_preserves_existing_instruction_and_home_variants(self):
+        variants = [('AGENTS.md', 'README.md'), ('AGENTS.md', 'Home.md'),
+                    ('AGENTS.md', 'Home.md', 'README.md'), ('Home.md',), ('README.md',), (),
+                    ('agents.md', 'home.md', 'readme.md')]
+        for index, names in enumerate(variants):
+            with self.subTest(existing=names):
+                project, state = self.fixture('explicit-include-' + str(index))
+                (project / 'Home.md').unlink()
+                originals = {name: ('# Existing ' + name + '\r\nKeep Δ instructions.\nNo final newline').encode() for name in names}
+                for name, data in originals.items():
+                    (project / name).write_bytes(data)
+                (project / 'Note.md').write_bytes(b'# Explicitly included\r\n')
+                (project / 'Unrelated.md').write_bytes(b'# Excluded unrelated note\n')
+                args = self.init_args(project, state) + ['--include', 'Note.md']
+                initialized = self.run_cli(args)['data']
+                snapshot = self.coordinator(project, state, 'snapshot')
+                for name, data in originals.items():
+                    self.assertEqual((project / name).read_bytes(), data)
+                    self.assertEqual(snapshot['files'][name].encode(), data)
+                self.assertEqual(snapshot['files']['Note.md'], '# Explicitly included\r\n')
+                self.assertNotIn('Unrelated.md', snapshot['files'])
+                self.assertEqual((project / 'Unrelated.md').read_bytes(), b'# Excluded unrelated note\n')
+                expected = set(names) | {'Note.md'}
+                if not any(name.casefold() == 'agents.md' for name in names):
+                    expected.add('AGENTS.md')
+                if not any(name.casefold() in {'home.md', 'readme.md'} for name in names):
+                    expected.add('README.md')
+                self.assertEqual(set(snapshot['files']), expected)
+                self.assertEqual(initialized['receipt']['readiness'], 'partial', 'Excluded local note is not an accepted receipt')
+                intent = (state / 'setup-intent.json').read_bytes()
+                token = (state / 'member.token').read_bytes()
+                retried = self.run_cli(args)['data']
+                self.assertEqual(retried['project_id'], initialized['project_id'])
+                self.assertEqual((state / 'setup-intent.json').read_bytes(), intent)
+                self.assertEqual((state / 'member.token').read_bytes(), token)
+                self.assertEqual(self.coordinator(project, state, 'snapshot'), snapshot)
+                for name, data in originals.items():
+                    self.assertEqual((project / name).read_bytes(), data)
+                self.assert_private(project, state)
+
+    def test_explicit_include_foundations_survive_interruption_and_preserve_later_edits(self):
+        project, state = self.fixture('include-recovery')
+        originals = {'AGENTS.md': b'# Existing rules\r\nDo not replace.',
+                     'README.md': '# Existing résumé\nKeep owner context.'.encode(),
+                     'Home.md': b'# Existing landing page\r\n'}
+        for name, content in originals.items():
+            (project / name).write_bytes(content)
+        (project / 'Note.md').write_bytes(b'# Explicit note\n')
+        args = self.init_args(project, state) + ['--include', 'Note.md']
+        self.crash('after-intent', args)
+        original_intent = (state / 'setup-intent.json').read_bytes()
+        saved = json.loads(original_intent)
+        for name, content in originals.items():
+            self.assertEqual(saved['snapshot']['files'][name].encode(), content)
+            (project / name).write_bytes(b'POST-INTERRUPTION-' + name.encode())
+        finished = self.run_cli(args)['data']
+        self.assertEqual(finished['receipt']['readiness'], 'ready')
+        self.assertEqual((state / 'setup-intent.json').read_bytes(), original_intent)
+        for name, content in originals.items():
+            self.assertEqual((project / name).read_bytes(), content)
+            self.assertTrue(any(('POST-INTERRUPTION-' + name).encode() in path.read_bytes()
+                                for path in (state / 'client/drafts').glob('*.json')))
+        before = self.coordinator(project, state, 'snapshot')
+        self.run_cli(args)
+        self.assertEqual(self.coordinator(project, state, 'snapshot'), before)
+        self.assert_private(project, state)
+
+    def test_invalid_excluded_foundation_refused_before_private_setup_creation(self):
+        for label, name, content in [('invalid-utf8', 'AGENTS.md', b'\xff\xfe'),
+                                      ('oversize', 'README.md', b'x' * (10 * 1024 * 1024 + 1))]:
+            with self.subTest(kind=label):
+                project, state = self.fixture(label)
+                (project / name).write_bytes(content)
+                (project / 'Note.md').write_bytes(b'# Included\n')
+                original_home = (project / 'Home.md').read_bytes()
+                self.run_cli(self.init_args(project, state) + ['--include', 'Note.md'], expected=3)
+                self.assertFalse(state.exists())
+                self.assertFalse((project / '.shared-memory.json').exists())
+                self.assertEqual((project / name).read_bytes(), content)
+                self.assertEqual((project / 'Home.md').read_bytes(), original_home)
+
+    def test_excluded_foundation_symlink_refused_before_private_setup_creation(self):
+        project, state = self.fixture('foundation-link')
+        outside = self.root / 'private-instructions.md'
+        outside.write_bytes(b'PRIVATE-OUTSIDE-INSTRUCTIONS')
+        try:
+            (project / 'AGENTS.md').symlink_to(outside)
+        except OSError:
+            self.skipTest('File symlink creation unavailable')
+        (project / 'Note.md').write_bytes(b'# Included\n')
+        self.run_cli(self.init_args(project, state) + ['--include', 'Note.md'], expected=3)
+        self.assertFalse(state.exists())
+        self.assertFalse((project / '.shared-memory.json').exists())
+        self.assertEqual(outside.read_bytes(), b'PRIVATE-OUTSIDE-INSTRUCTIONS')
+
     def test_init_hard_exit_boundaries_resume_exact_identity_token_and_source_snapshot(self):
         boundaries = ['before-intent', 'after-intent', 'after-credential', 'inside-authority',
                       'after-authority', 'after-authority-publish', 'after-project-write', 'before-manifest', 'after-manifest']

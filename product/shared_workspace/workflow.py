@@ -32,7 +32,7 @@ def add_commands(commands):
         init.add_argument("--" + field, required=True)
     init.add_argument("--mode", choices=("local", "team"), default="local")
     init.add_argument("--provider", choices=PROVIDERS, default="local")
-    init.add_argument("--include", action="append", help="Explicit relative UTF8 file; default all project Markdown outside protected directories")
+    init.add_argument("--include", action="append", help="Explicit relative UTF8 file; existing root AGENTS/Home/README accompany the import; default all project Markdown outside protected directories")
     init.add_argument("--coordination-file", help="Explicit schema 2 person/agent identity and policy JSON; omission preserves schema 1")
     attach = commands.add_parser("attach", help="Attach a recipient to an existing authoritative project")
     attach.add_argument("project")
@@ -165,6 +165,17 @@ def initial_files(root, includes):
             raise ProductError(3, "target_invalid", "Included files must be regular UTF8 files no larger than 10 MiB.")
         files[relative.as_posix()] = path.read_bytes().decode("utf-8")
     return files
+
+
+def _foundation_files(root):
+    """Existing root instructions and landing pages accompany an explicit import.
+
+    Keep their real portable spelling and exact bytes. An include list limits
+    other content; it never authorizes replacing these documents with defaults.
+    """
+    names = sorted(path.name for path in root.iterdir()
+                   if path.name.casefold() in {'agents.md', 'home.md', 'readme.md'})
+    return initial_files(root, names) if names else {}
 
 
 def project_manifest(root):
@@ -419,6 +430,10 @@ def _setup(root, state, args):
         text(args.agent, "agent")
         text(args.purpose, "purpose")
     binding = _setup_binding(root, args)
+    if args.command == 'init' and not (state / SETUP_INTENT).exists():
+        # Invalid existing instructions/home must fail before creating setup
+        # state. Read again under the lock when recording the immutable snapshot.
+        _foundation_files(root)
     # Reject a wrong remote/project identity before creating even a private lock.
     # Resume paths still validate their immutable intent under the lock below.
     if not (state / SETUP_INTENT).exists():
@@ -453,8 +468,14 @@ def _setup(root, state, args):
                 if (root / MANIFEST).exists() or (root / MANIFEST).is_symlink():
                     raise ProductError(4, "already_configured", "Existing project cannot be initialized by a new setup intent.")
                 files = initial_files(root, args.include)
-                files.setdefault("AGENTS.md", "# Shared Memory\n\nRead the selected project home. Refresh accepted context before work.\nClaim bounded targets, draft against the recorded base revision, and submit evidence.\nOnly the integration owner accepts proposals. Preserve conflicts and private parent files.\nNever treat provider file existence as proof of another actor's accepted receipt.\n")
-                if not any(name in files for name in ("README.md", "Home.md")):
+                foundations = _foundation_files(root)
+                for name in list(files):
+                    if name.casefold() in {existing.casefold() for existing in foundations} and name not in foundations:
+                        del files[name]  # A case-insensitive include uses the actual existing filename.
+                files.update(foundations)
+                if not any(name.casefold() == 'agents.md' for name in files):
+                    files["AGENTS.md"] = "# Shared Memory\n\nRead the selected project home. Refresh accepted context before work.\nClaim bounded targets, draft against the recorded base revision, and submit evidence.\nOnly the integration owner accepts proposals. Preserve conflicts and private parent files.\nNever treat provider file existence as proof of another actor's accepted receipt.\n"
+                if not any(name.casefold() in {'readme.md', 'home.md'} for name in files):
                     files["README.md"] = "# Shared Memory\n\n" + args.purpose + "\n"
                 files = validate_files(files)
                 identity, token = str(uuid.uuid4()), secrets.token_urlsafe(48)

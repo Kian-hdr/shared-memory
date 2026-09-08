@@ -1,5 +1,45 @@
 # Validation record
 
+## Requirement audit: selected import and factual conflict routing, 2026-09-08
+
+The post-8b33a8e audit reproduced two further gaps. Packaged `init --include Note.md`
+replaced existing root instructions/home with generated defaults even though their
+original bytes were recoverable in private backups. A schema-2 factual conflict
+recorded its responsible owner but notified only the producer/integrator, omitting
+a distinct reviewer. Historical green checks did not cover these cases.
+
+Setup now imports existing root AGENTS/Home/README with their actual portable
+filenames and exact bytes, and generates only missing foundation documents.
+Other explicitly excluded notes remain unchanged outside authority. Packaged
+regressions cover seven existing-document combinations, exact retries, real
+after-intent interruption with later edits, and invalid/oversize/linked documents.
+On each local Python 3.13 and 3.12 run the setup/team/path group collected 55 tests:
+42 passed and 13 Windows-only junction cases skipped. Independent review repeated
+the original preservation scenario against the corrected source and passed it.
+
+Conflict notices now include the persisted conflict IDs/status and the responsible
+semantic reviewers, using existing recipient deduplication and the transaction.
+The regression failed with zero owner notices before the fix. It now verifies
+distinct owner receipt, one producer/integrator receipt, unrelated-owner isolation,
+unchanged accepted knowledge, reopened inbox consumption and idempotent acknowledgement.
+Failure injected after real inbox writes rolls back notices, conflicts and events.
+All 47 coordination tests passed on each local Python 3.13/3.12 run, including the
+existing process-crash checks. The fixture's first acknowledgement assertion was
+corrected to compare inbox/events rather than the intentionally advancing clock.
+Independent source/test review approved the correction. Repeated conflict attempts
+retain the existing event-per-attempt behavior; this does not claim automatic truth
+checking or new decision authority.
+
+The final combined local Python 3.13 suite collected **356 tests: 336 passed and
+20 Windows-only cases skipped**, in 82.641 seconds. Exact final package and
+changed-source cross-OS results are recorded separately when complete.
+Real provider, independent-person and operational
+deployment gates remain open. The prior 8b33a8e checkpoint passed all twelve
+[CI jobs](https://github.com/Kian-hdr/shared-memory/actions/runs/34248482601) and all
+four [HTTPS jobs](https://github.com/Kian-hdr/shared-memory/actions/runs/34248511266),
+with 351 tests per product job and 425 packaged HTTPS calls/four expected refusals.
+Those results remain historical evidence and do not negate these newly found gaps.
+
 ## Requirement audit: alias resolution and reassignment inbox, 2026-09-08
 
 The post-3121f47 audit found two gaps in the accepted GRAPH-01 and COORD-07 gates.

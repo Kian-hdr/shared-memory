@@ -310,8 +310,8 @@ class Coordination:
                        'data': data or {}, 'acknowledged': False}
             _put(self.db, 'coord_inbox', message['message_id'], message)
 
-    def publish_notice(self, item, kind, data=None):
-        self.notify([item['actor'], item['integration_owner']], kind, item['assignment_id'], data)
+    def publish_notice(self, item, kind, data=None, *, additional_actors=()):
+        self.notify([item['actor'], item['integration_owner'], *additional_actors], kind, item['assignment_id'], data)
 
     def dependencies(self, values, assignment_id):
         if not isinstance(values, list) or len(values) > 100:
@@ -952,7 +952,13 @@ class Coordination:
             request = {key: value for key, value in payload.items() if key != 'coordination'}
         result = getattr(self.engine, '_op_' + operation)(self.db, self.state, self.member, request)
         if self.db.execute('SELECT max(seq) FROM events').fetchone()[0] != previous_event:
-            self.publish_notice(item, 'proposal-' + operation, {'proposal_id': payload['proposal_id']})
+            notice = {'proposal_id': payload['proposal_id']}
+            reviewers = []
+            if operation == 'accept' and result.get('status') == 'conflict':
+                notice.update(status='conflict', conflict_ids=[conflict['conflict_id'] for conflict in result['conflicts']])
+                reviewers = [conflict['responsible_owner'] for conflict in result['conflicts']
+                             if conflict['kind'] == 'semantic']
+            self.publish_notice(item, 'proposal-' + operation, notice, additional_actors=reviewers)
         return result
 
     def handoff(self, payload):

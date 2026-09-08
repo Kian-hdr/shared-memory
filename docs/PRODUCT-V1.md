@@ -96,8 +96,11 @@ prepares the same authority for team transport, and `--provider google-drive`,
 `onedrive`, `icloud` or `self-hosted` records the intended storage route. Choosing a
 provider grants no access. Team mode reports partial until its external checks pass.
 Initial import defaults to Markdown; repeated `--include RELATIVE_FILE` selects
-explicit UTF8 files. Existing instructions/home are preserved; missing ones are
-created. Legacy `Coordination/` or `.workspace-project.json` causes a refusal and
+explicit UTF8 files. Existing root `AGENTS.md`, `Home.md` and `README.md` accompany
+that import, retaining their actual filename spelling and exact content. Missing
+instructions or a missing home are created; defaults never replace existing ones.
+Other excluded files stay unchanged outside accepted state and may yield a partial
+receipt. Legacy `Coordination/` or `.workspace-project.json` causes a refusal and
 requires reviewed migration, rather than silent replacement.
 
 If `init` or `attach` is interrupted, rerun the original command with the same
