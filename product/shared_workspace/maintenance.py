@@ -17,6 +17,7 @@ import zipfile
 from .bundle import open_bundle
 from .errors import ProductError
 from .workflow import private_path, selected_root, write_private, json_file
+from .path_safety import absolute_path, is_link_or_reparse, unsafe_ancestor
 
 COMMANDS = ("install-package", "rollback-package", "migration-plan", "git-isolate", "backup-coordinator", "recover-coordinator")
 
@@ -75,7 +76,7 @@ def activate(tools, digest, version):
             stream.write(json.dumps(entry, indent=2) + "\n")
             stream.flush()
             os.fsync(stream.fileno())
-        if current.is_symlink():
+        if unsafe_ancestor(current) is not None:
             raise ProductError(3, "install_path_unsafe", "Active package pointer cannot be a symbolic link.")
         os.replace(temporary, current)
     finally:
@@ -125,8 +126,10 @@ digest is checked by the caller; an internally valid manifest is not authenticit
 
 def install(package, expected, tools):
     digest_string(expected)
-    package = Path(package)
-    if package.is_symlink() or not package.is_file() or sha(package) != expected:
+    if unsafe_ancestor(package) is not None:
+        raise ProductError(3, "package_mismatch", "Package bytes do not match the reviewed external SHA-256.")
+    package = absolute_path(package)
+    if not package.is_file() or sha(package) != expected:
         raise ProductError(3, "package_mismatch", "Package bytes do not match the reviewed external SHA-256.")
     tools = private_path(tools)
     version = inspect_package(package)["product_version"]
@@ -135,7 +138,7 @@ def install(package, expected, tools):
     versions.mkdir(mode=0o700, exist_ok=True)
     target = versions / (expected + ".pyz")
     if target.exists():
-        if target.is_symlink() or sha(target) != expected:
+        if unsafe_ancestor(target) is not None or sha(target) != expected:
             raise ProductError(3, "installed_integrity", "Existing immutable installed package was modified.")
     else:
         fd, temporary = tempfile.mkstemp(prefix=".package-", suffix=".partial", dir=versions)
@@ -151,7 +154,7 @@ def install(package, expected, tools):
             try:
                 os.link(temporary, target)
             except FileExistsError:
-                if target.is_symlink() or sha(target) != expected:
+                if unsafe_ancestor(target) is not None or sha(target) != expected:
                     raise ProductError(3, "installed_integrity", "Concurrent install target has unexpected bytes.")
         finally:
             if os.path.exists(temporary):
@@ -160,15 +163,44 @@ def install(package, expected, tools):
 
 
 def migration_plan(source, destination):
+    if unsafe_ancestor(Path(source).expanduser()) is not None:
+        raise ProductError(3, "project_path_unsafe", "Choose the physical selected folder without symbolic links or reparse points.")
     source = selected_root(source)
-    destination = Path(destination).expanduser().absolute()
-    if destination.exists() or destination.is_symlink() or destination.resolve().is_relative_to(source):
+    raw_destination = Path(destination).expanduser()
+    if unsafe_ancestor(raw_destination) is not None:
+        raise ProductError(3, "migration_target_invalid", "Plan a fresh destination outside the selected source tree.")
+    destination = absolute_path(raw_destination).resolve()
+    if unsafe_ancestor(destination) is not None or destination.exists() or destination.is_relative_to(source):
         raise ProductError(3, "migration_target_invalid", "Plan a fresh destination outside the selected source tree.")
     files, warnings, links, names = {}, [], [], {}
     from .engine import PROTECTED
-    for path in sorted(source.rglob("*")):
+    # Prune private directories and links before enumerating any descendants.
+    # A rglob inventory can cross a Windows junction even when later file reads
+    # are filtered. Recheck discovered ancestors before content access as well.
+    pending = [source]
+    paths = []
+    while pending:
+        folder = pending.pop()
+        if unsafe_ancestor(folder) is not None:
+            warnings.append({"path": folder.relative_to(source).as_posix(), "issue": "symlink_requires_manual_review"})
+            continue
+        with os.scandir(folder) as entries:
+            children = sorted((Path(entry.path) for entry in entries), reverse=True)
+        for path in children:
+            relative = path.relative_to(source).as_posix()
+            if is_link_or_reparse(path):
+                warnings.append({"path": relative, "issue": "symlink_requires_manual_review"})
+            elif path.name.startswith('.'):
+                warnings.append({"path": relative, "issue": "private_or_hidden_file_excluded"})
+            elif path.name.casefold() in PROTECTED | {"connection.json", "member.token"}:
+                warnings.append({"path": relative, "issue": "private_state_or_credential_excluded"})
+            elif path.is_dir():
+                pending.append(path)
+            else:
+                paths.append(path)
+    for path in sorted(paths):
         relative = path.relative_to(source).as_posix()
-        if path.is_symlink():
+        if unsafe_ancestor(path) is not None:
             warnings.append({"path": relative, "issue": "symlink_requires_manual_review"})
             continue
         if not path.is_file():
@@ -184,6 +216,10 @@ def migration_plan(source, destination):
             continue
         files[relative] = {"sha256": sha(path), "bytes": path.stat().st_size}
         if path.suffix.casefold() == ".md" and path.stat().st_size <= 10 * 1024 * 1024:
+            if unsafe_ancestor(path) is not None:
+                files.pop(relative)
+                warnings.append({"path": relative, "issue": "symlink_requires_manual_review"})
+                continue
             names.setdefault(path.stem, []).append(relative)
             for target in re.findall(r"\[\[([^\]]+)\]\]", path.read_text(encoding="utf-8")):
                 links.append((relative, target.replace("\\|", "|").split("|")[0].split("#")[0]))
@@ -198,6 +234,7 @@ def migration_plan(source, destination):
             resolved = len(names.get(Path(target).stem, [])) == 1
         if not resolved:
             missing.append({"path": path, "target": target})
+    warnings.sort(key=lambda item: (item['path'], item['issue']))
     plan = {"schema_version": 1, "source": str(source), "destination": str(destination), "files": files,
             "warnings": warnings, "external_or_unresolved_wikilinks": missing,
             "actions": ["Verify independent backup and intended working copy", "Review excluded/private files and links",
@@ -297,7 +334,7 @@ def dispatch(bundle, args):
     if args.command == "rollback-package":
         tools = private_path(args.tools_dir)
         path = tools / "versions" / (digest_string(args.sha256) + ".pyz")
-        if path.is_symlink() or not path.is_file() or sha(path) != args.sha256:
+        if unsafe_ancestor(path) is not None or not path.is_file() or sha(path) != args.sha256:
             raise ProductError(3, "rollback_invalid", "Requested previously installed package is missing or modified.")
         reviewed = inspect_package(path)
         return activate(tools, args.sha256, reviewed["product_version"])

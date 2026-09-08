@@ -13,11 +13,11 @@ import os
 from pathlib import Path
 import re
 import stat
-import sys
 import tempfile
 import uuid
 
 from .errors import ProductError
+from .path_safety import absolute_path, unsafe_ancestor
 
 # Use one portable-path and snapshot policy for authority and materialization.
 from .engine import (MAX_FILE_BYTES, MAX_SNAPSHOT_BYTES as MAX_TOTAL_BYTES,
@@ -83,23 +83,13 @@ def _snapshot(value, expected=None):
 
 
 def _absolute(path):
-    path = Path(os.path.abspath(path))
-    # macOS exposes its system temporary roots through fixed OS-owned aliases.
-    if sys.platform == 'darwin':
-        for alias in ('/var', '/tmp', '/etc'):
-            prefix = Path(alias)
-            if path.is_relative_to(prefix) and prefix.is_symlink() and prefix.resolve() == Path('/private' + alias):
-                path = Path('/private' + alias) / path.relative_to(prefix)
-                break
-    return path
+    return absolute_path(path)
 
 
 def _no_symlinks(path):
-    path = _absolute(path)
-    for part in [path, *path.parents]:
-        if part.is_symlink():
-            _error('unsafe_path', 'Symlink paths are not supported: ' + str(part))
-    return path
+    if unsafe_ancestor(path) is not None:
+        _error('unsafe_path', 'Symlink or reparse-point paths are not supported: ' + str(path))
+    return _absolute(path)
 
 
 def _fsync_dir(path):
@@ -185,8 +175,8 @@ def _io_errors(method):
 
 class Client:
     def __init__(self, project_root, state_dir, request):
-        self.root = _absolute(project_root)
-        self.state = _absolute(state_dir)
+        self.root = _no_symlinks(project_root)
+        self.state = _no_symlinks(state_dir)
         self.request = request
         self._excluded = []
         self._locations()
@@ -295,20 +285,29 @@ class Client:
         finally:
             os.close(fd)
 
-    def _scan(self, required=None):
-        files = {}
-        required = set(required or ())
-        self._excluded = []
+    def _walk(self):
+        """Inspect managed entries before descent; excluded state stays opaque."""
+        _no_symlinks(self.root)
         for directory, dirs, names in os.walk(self.root, followlinks=False):
+            _no_symlinks(Path(directory))
             for name in list(dirs):
                 child = Path(directory) / name
                 if name.casefold() in PROTECTED:
                     dirs.remove(name)
-                elif child.is_symlink():
-                    _error('unsafe_path', 'Symlink project directory is unsupported.')
+                else:
+                    _no_symlinks(child)
+            managed = [name for name in names if name.casefold() not in PROTECTED
+                       and not name.startswith('.shared-memory-write-')]
+            for name in managed:
+                _no_symlinks(Path(directory) / name)
+            yield directory, dirs, managed
+
+    def _scan(self, required=None):
+        files = {}
+        required = set(required or ())
+        self._excluded = []
+        for directory, dirs, names in self._walk():
             for name in names:
-                if name.casefold() in PROTECTED or name.startswith('.shared-memory-write-'):
-                    continue
                 relative = (Path(directory) / name).relative_to(self.root).as_posix()
                 path = self._target(relative)
                 if relative not in required and (path.suffix.casefold() in BINARY_ARTIFACT_SUFFIXES or path.name == '.DS_Store'):

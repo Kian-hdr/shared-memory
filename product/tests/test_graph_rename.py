@@ -9,7 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, call, patch
 
 TESTS = Path(__file__).resolve().parent
 sys.path.insert(0, str(TESTS))
@@ -25,6 +25,39 @@ class RenameTests(unittest.TestCase):
     call = fixtures.ClientTests.call
     claim = fixtures.ClientTests.claim
     publish = fixtures.ClientTests.publish
+
+    def test_original_root_is_guarded_before_canonicalization_and_canonical_root_is_rechecked(self):
+        # Model Windows lexical/8.3 expansion without pretending macOS is NTFS.
+        # Native package tests below exercise actual equivalent Windows paths.
+        observed = Mock()
+        lexical = Mock()
+        canonical = self.project.resolve()
+        lexical.resolve.side_effect = lambda: (observed.resolve(), canonical)[1]
+        def guard(path):
+            observed.guard(path)
+            return canonical if path == canonical else lexical
+        supplied = Path('LEXICAL~1') / 'Selected folder'
+        with patch.object(rename.knowledge, '_absolute', side_effect=guard):
+            self.assertEqual(rename._selected_root(supplied), canonical)
+        self.assertEqual(observed.mock_calls, [call.guard(supplied), call.resolve(), call.guard(canonical)])
+        lexical.reset_mock()
+        with patch.object(rename.knowledge, '_absolute', side_effect=ProductError(3, 'knowledge_root', 'Refused reparse')):
+            with self.assertRaises(ProductError):
+                rename._selected_root(supplied)
+        lexical.resolve.assert_not_called()
+
+    @unittest.skipIf(os.name == 'nt', 'Windows junction spelling is exercised in packaged tests')
+    def test_link_parent_spelling_cannot_disappear_before_root_guard(self):
+        alias = self.root / 'Alias'
+        alias.symlink_to(self.project, target_is_directory=True)
+        try:
+            supplied = alias / '..' / self.project.relative_to(self.root)
+            self.assertEqual(Path(os.path.abspath(supplied)), self.project)
+            with self.assertRaises(ProductError) as caught:
+                rename._selected_root(supplied)
+            self.assertEqual(caught.exception.code, 'knowledge_root')
+        finally:
+            alias.unlink()
 
     def setup_notes(self):
         self.claim()
@@ -284,6 +317,60 @@ class RenameCLITests(unittest.TestCase):
     cli = cli_fixtures.TeamCLITests.cli
     initialize = cli_fixtures.TeamCLITests.initialize
     coord = cli_fixtures.TeamCLITests.coord
+
+    def test_genuinely_different_root_with_same_project_metadata_remains_rejected(self):
+        self.initialize()
+        other = self.root / 'Different selected root'
+        other.mkdir()
+        for name in ('Home.md', '.shared-memory.json'):
+            (other / name).write_bytes((self.project / name).read_bytes())
+        before = fixtures.filesystem(self.root)
+        self.cli('graph-rename-plan', other, self.state, '--source', 'Home.md', '--destination', 'Moved.md', expected=4)
+        self.assertEqual(fixtures.filesystem(self.root), before)
+
+    @unittest.skipUnless(os.name == 'nt', 'Actual Windows canonical case and 8.3 spelling')
+    def test_windows_equivalent_lexical_roots_bind_same_saved_client(self):
+        import ctypes
+        from ctypes import wintypes
+        self.initialize()
+        saved = json.loads((self.state / 'client/client.json').read_bytes())['project_root']
+        differently_cased = str(self.project).swapcase()
+        self.assertNotEqual(differently_cased, saved)
+        self.assertEqual(str(Path(differently_cased).resolve()), saved)
+        variants = [differently_cased]
+        get_short = ctypes.windll.kernel32.GetShortPathNameW
+        get_short.argtypes = (wintypes.LPCWSTR, wintypes.LPWSTR, wintypes.DWORD)
+        get_short.restype = wintypes.DWORD
+        buffer = ctypes.create_unicode_buffer(32768)
+        length = get_short(str(self.project), buffer, len(buffer))
+        self.assertGreater(length, 0)
+        self.assertLess(length, len(buffer))
+        if buffer.value != saved:
+            self.assertEqual(str(Path(buffer.value).resolve()), saved)
+            variants.append(buffer.value)
+        initial = self.cli('graph-rename-plan', self.project, self.state, '--source', 'Home.md', '--destination', 'Moved.md')
+        for variant in variants:
+            with self.subTest(spelling=variant):
+                before = fixtures.filesystem(self.root)
+                result = self.cli('graph-rename-plan', variant, self.state, '--source', 'Home.md', '--destination', 'Moved.md')
+                self.assertEqual(result, initial)
+                self.assertEqual(fixtures.filesystem(self.root), before)
+
+    @unittest.skipUnless(os.name == 'nt', 'Actual Windows junction must be rejected before normalization')
+    def test_windows_package_junction_root_not_normalized_into_authorized_root(self):
+        self.initialize()
+        junction = self.root / 'Junction alias'
+        made = subprocess.run(['cmd', '/c', 'mklink', '/J', str(junction), str(self.project)], capture_output=True)
+        self.assertEqual(made.returncode, 0)
+        try:
+            before = fixtures.filesystem(self.project)
+            state_before = fixtures.filesystem(self.state)
+            for supplied in (junction, junction / '..' / self.project.relative_to(self.root)):
+                self.cli('graph-rename-plan', supplied, self.state, '--source', 'Home.md', '--destination', 'Moved.md', expected=3)
+            self.assertEqual(fixtures.filesystem(self.project), before)
+            self.assertEqual(fixtures.filesystem(self.state), state_before)
+        finally:
+            os.rmdir(junction)
 
     def test_packaged_plan_draft_submit_accept_apply_exact_bytes(self):
         (self.project / 'Old.md').write_bytes('# Résumé\r\nNo final newline'.encode())

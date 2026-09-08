@@ -12,8 +12,7 @@ name is a product decision; trademark and domain clearance are unverified.
 Kian selected a separate repository for Shared Memory because its scope has grown
 beyond the original Obsidian workspace toolkit. This supersedes the earlier plan
 to rename the toolkit repository at first-version launch. The product uses
-`Kian-hdr/shared-memory`; the original repository remains the legacy toolkit record
-and is being made private. The new product repository also remains private during
+`Kian-hdr/shared-memory`; the original repository remains the private legacy toolkit record. The new product repository also remains private during
 development and becomes public only when version 1 is finished, as Kian specified.
 Source history and attribution are preserved.
 

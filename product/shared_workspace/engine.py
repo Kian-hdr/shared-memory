@@ -12,13 +12,13 @@ import json
 import os
 import re
 import sqlite3
-import sys
 import unicodedata
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 
 from .errors import ProductError
+from .path_safety import absolute_path, unsafe_ancestor
 
 SCHEMA_VERSION = 1
 COORDINATION_SCHEMA_VERSION = 2
@@ -167,20 +167,18 @@ class Coordinator:
 
     @staticmethod
     def _safe_db_path(db_path):
-        source = Path(os.path.abspath(Path(db_path).expanduser()))
-        if sys.platform == "darwin":
-            for alias in ("/var", "/tmp", "/etc"):
-                prefix = Path(alias)
-                if source.is_relative_to(prefix) and prefix.is_symlink() and prefix.resolve() == Path("/private" + alias):
-                    source = Path("/private" + alias) / source.relative_to(prefix)
-                    break
-        if any(path.is_symlink() for path in (source, *source.parents)):
-            malformed("Coordinator database and parent directories may not use symbolic links.")
+        raw = Path(db_path).expanduser()
+        if unsafe_ancestor(raw) is not None:
+            malformed("Coordinator database and parent directories may not use symbolic links or reparse points.")
+        source = absolute_path(raw)
+        for path in (source, *(Path(str(source) + suffix) for suffix in ('-journal', '-wal', '-shm'))):
+            if unsafe_ancestor(path) is not None:
+                malformed("Coordinator database, journals and parent directories may not use symbolic links or reparse points.")
         return source
 
     def _connect(self, readonly=False):
         self._safe_db_path(self.db_path)
-        if not self.db_path.is_file() or self.db_path.is_symlink():
+        if not self.db_path.is_file():
             raise ProductError(5, "engine_environment", "Coordinator database is missing or not a regular local file.")
         uri = self.db_path.as_uri() + ("?mode=ro" if readonly else "?mode=rw")
         connection = sqlite3.connect(uri, uri=True, timeout=20, isolation_level=None)

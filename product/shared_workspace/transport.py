@@ -28,8 +28,9 @@ def loopback(host):
 
 
 def read_token(path):
+    from .path_safety import unsafe_ancestor
     path = Path(path)
-    if not path.is_file() or path.is_symlink():
+    if unsafe_ancestor(path) is not None or not path.is_file():
         raise ProductError(5, "credential_missing", "A regular private token file is required.")
     if os.name != "nt" and path.stat().st_mode & 0o077:
         raise ProductError(5, "credential_permissions", "Token file must be readable only by its owner (mode 0600).")

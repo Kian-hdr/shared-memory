@@ -10,6 +10,42 @@ Historical links below identify runs in the legacy repository and may require ac
 after it becomes private. They are not new-repository CI results. The new repository
 checkpoint below records its own completed validation separately.
 
+## Selected-root and core path-boundary correction, 2026-09-08
+
+The `24f1ff3` candidate is withheld. Its [matrix](https://github.com/Kian-hdr/shared-memory/actions/runs/34243071900)
+passed ten jobs, but both Windows product jobs rejected valid rename plans with
+`project_mismatch`: setup saved a canonical root while rename compared a lexical
+path. The correction checks the original path for links/reparse points before
+canonicalizing, then validates the canonical path and saved binding. Dedicated
+Windows regressions cover case/short-name aliases and junction-root refusal.
+
+An adjacent source review found that ordinary client scanning/materialization and
+setup/private database paths still needed equivalent junction guards. Directory
+junctions cannot be treated as harmless merely because `is_symlink()` is false.
+The correction now shares original-path checks across client scanning/materialization,
+setup, private files/tokens, database sidecars, delivery staging and local backend
+traversal, migration previews, runtime install/rollback and retained backup hashing.
+Raw `alias/../` components are checked before normalization. Protected directories
+are pruned before enumeration. Canonical destination containment, backup checksums,
+checkpoint verification and durability checks remain in place. This does not provide
+an OS lock against hostile concurrent filesystem replacement.
+
+Independent source/test review approved the combined changes. On each local Python
+3.13 and 3.12 run, the core group collected 182 tests: 169 passed and 13 actual
+Windows junction cases skipped; the adjacent group collected 62: 59 passed and
+three Windows-only cases skipped. The final graph group on 3.13 collected 21:
+18 passed and three Windows-only cases skipped. These groups overlap existing
+regressions and must not be added together as distinct coverage. The final combined
+Python 3.13 suite collected **345 tests: 324 passed and 21 Windows-only cases
+skipped**, in 73.892 seconds. Actual Windows/macOS/Linux matrix and exact-source
+HTTPS execution remain separate acceptance evidence.
+
+The same candidate's [schema-2 HTTPS trial](https://github.com/Kian-hdr/shared-memory/actions/runs/34243094389)
+passed all four jobs and 423 packaged calls/four expected refusals. All three OS
+clients reached revision 5 with matching content, preserved private bytes and
+stopped temporary processes. This separate protocol result does not override the
+failed Windows rename matrix or pass provider/independent-person acceptance.
+
 ## Scoped product rename and context validation, 2026-09-08
 
 The new graph rename plan/draft/apply workflow preserves selected-folder boundaries
@@ -25,7 +61,7 @@ Windows-only junction tests skipped**, in 76.122 seconds. The focused rename/cli
 graph suite passed 87 of 90 with three platform skips on both 3.13 and 3.12;
 following generic context fixes, all ten team CLI cases passed on both, with the
 two new malformed-context cases independently rerun. Actual Windows execution and
-the new 20-command packaged rename fixture are included in the pending matrix.
+the new 20-command packaged rename fixture were included in the matrix above; Windows failed before that fixture could run, while macOS/Linux completed it.
 
 A separate fixture ran the actual packaged schema-2 rename inside an existing
 registered Obsidian test vault, with private runtime state outside it. All 20 calls

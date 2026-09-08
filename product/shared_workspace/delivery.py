@@ -15,7 +15,6 @@ import os
 import re
 import stat
 import subprocess
-import sys
 import tempfile
 import threading
 import time
@@ -27,6 +26,7 @@ from typing import Protocol
 from .engine import (MAX_FILE_BYTES, MAX_FILES, MAX_SNAPSHOT_BYTES, canonical,
                      files_hash, path_inventory, validate_files, validate_path)
 from .errors import ProductError
+from .path_safety import absolute_path, is_link_or_reparse, unsafe_ancestor
 
 MANIFEST_LIMIT = 16 * 1024 * 1024
 LIST_LIMIT = 32 * 1024 * 1024
@@ -108,17 +108,9 @@ def _object_path(name):
 
 
 def _safe_local(path, *, directory=False, fresh=False):
-    path = Path(os.path.abspath(path))
-    # Resolve the fixed macOS /var and /tmp aliases, not arbitrary user symlinks.
-    if sys.platform == 'darwin':
-        for alias in ('/var', '/tmp', '/etc'):
-            prefix = Path(alias)
-            if path.is_relative_to(prefix) and prefix.is_symlink() and prefix.resolve() == Path('/private' + alias):
-                path = Path('/private' + alias) / path.relative_to(prefix)
-                break
-    for parent in (path, *path.parents):
-        if parent.is_symlink():
-            fail('delivery_path', 'Private delivery paths cannot use symlinks.')
+    if unsafe_ancestor(path) is not None:
+        fail('delivery_path', 'Private delivery paths cannot use symlinks or reparse points.')
+    path = absolute_path(path)
     if fresh:
         if path.exists() or not path.parent.is_dir():
             fail('delivery_staging', 'Staging must be a fresh path with an existing private parent.')
@@ -457,12 +449,13 @@ class LocalRcloneBackend(_Rclone):
         # Local symlinks would otherwise be hidden from rclone listings.
         count = 0
         for base, dirs, files in os.walk(path, followlinks=False):
+            _safe_local(base, directory=True)
             count += len(dirs) + len(files)
             if count > ENTRY_LIMIT:
                 fail('delivery_limit', 'Fixture directory inventory exceeds its entry limit.')
             for name in dirs + files:
                 entry = Path(base) / name
-                if entry.is_symlink() or not (entry.is_dir() or entry.is_file()):
+                if is_link_or_reparse(entry) or not (entry.is_dir() or entry.is_file()):
                     fail('delivery_path', 'Fixture transport requires ordinary files and directories.')
         raw = self._run(['lsjson', str(path), '--recursive', '--no-modtime'], maximum=LIST_LIMIT)
         entries = _json(raw)

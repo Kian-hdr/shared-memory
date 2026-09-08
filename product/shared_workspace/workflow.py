@@ -15,6 +15,7 @@ import uuid
 
 from . import PRODUCT_VERSION
 from .errors import ProductError
+from .path_safety import absolute_path, unsafe_ancestor, is_link_or_reparse
 from .providers import PROVIDERS, capabilities, verify_receipt
 from .transport import LocalTransport, HTTPTransport, read_token, serve
 
@@ -86,12 +87,11 @@ def add_commands(commands):
 
 def private_path(value, project=None):
     raw = Path(value).expanduser().absolute()
-    # macOS system /tmp and /var aliases are resolved, but user-controlled links
-    # anywhere else are not accepted for credentials or private transactional state.
-    for path in (raw, *raw.parents):
-        if path.is_symlink() and str(path) not in {"/tmp", "/var", "/etc"}:
-            raise ProductError(3, "state_path_unsafe", "Private state cannot use symbolic links.")
-    path = raw.resolve()
+    if unsafe_ancestor(raw) is not None:
+        raise ProductError(3, "state_path_unsafe", "Private state cannot use symbolic links or reparse points.")
+    path = absolute_path(raw).resolve()
+    if unsafe_ancestor(path) is not None:
+        raise ProductError(3, "state_path_unsafe", "Private state cannot use symbolic links or reparse points.")
     lower = str(path).casefold()
     if any(marker in lower for marker in ("/cloudstorage/", "/mobile documents/", "onedrive", "googledrive", "google drive", "dropbox")) or str(path).startswith("\\\\"):
         raise ProductError(3, "state_path_unsafe", "Coordinator/client state belongs on local non-synchronized storage.")
@@ -102,8 +102,8 @@ def private_path(value, project=None):
 
 def write_private(path, data, *, exclusive=True):
     path = Path(path)
-    if path.is_symlink():
-        raise ProductError(3, "state_path_unsafe", "Private files cannot be symbolic links.")
+    if unsafe_ancestor(path) is not None:
+        raise ProductError(3, "state_path_unsafe", "Private files cannot traverse symbolic links or reparse points.")
     mode = os.O_WRONLY | os.O_CREAT | (os.O_EXCL if exclusive else os.O_TRUNC)
     with os.fdopen(os.open(path, mode, 0o600), "w", encoding="utf-8") as stream:
         stream.write(data)
@@ -112,7 +112,7 @@ def write_private(path, data, *, exclusive=True):
 
 
 def json_file(path):
-    if not Path(path).is_file() or Path(path).is_symlink():
+    if unsafe_ancestor(path) is not None or not Path(path).is_file():
         raise ProductError(5, "input_missing", "A regular JSON input file is required.")
     if Path(path).stat().st_size > 128 * 1024 * 1024:
         raise ProductError(3, "input_too_large", "JSON input exceeds 128 MiB.")
@@ -121,17 +121,35 @@ def json_file(path):
 
 def selected_root(value):
     raw = Path(value).expanduser().absolute()
-    for part in (raw, *raw.parents):
-        if part.is_symlink() and str(part) not in {"/tmp", "/var", "/etc"}:
-            raise ProductError(3, "project_path_unsafe", "Choose the physical selected folder without symbolic links.")
-    path = raw.resolve()
+    if unsafe_ancestor(raw) is not None:
+        raise ProductError(3, "project_path_unsafe", "Choose the physical selected folder without symbolic links or reparse points.")
+    path = absolute_path(raw).resolve()
+    if unsafe_ancestor(path) is not None:
+        raise ProductError(3, "project_path_unsafe", "Choose the physical selected folder without symbolic links or reparse points.")
     if not path.is_dir():
         raise ProductError(5, "project_missing", "Choose an existing selected project folder.")
     return path
 
 
 def initial_files(root, includes):
-    selected = [root / name for name in includes] if includes else list(root.rglob("*.md"))
+    from .engine import PROTECTED
+    if includes:
+        selected = [root / name for name in includes]
+    else:
+        selected = []
+        # Prune before descent. rglob can traverse Windows junctions even when
+        # later per-file checks would reject their resolved paths.
+        for directory, dirs, names in os.walk(root, followlinks=False):
+            if unsafe_ancestor(directory) is not None:
+                raise ProductError(3, "target_invalid", "Included paths cannot traverse links or reparse points.")
+            dirs[:] = [name for name in dirs if not name.startswith('.') and name != 'Coordination'
+                       and name.casefold() not in PROTECTED]
+            for name in dirs:
+                if unsafe_ancestor(Path(directory) / name) is not None:
+                    raise ProductError(3, "target_invalid", "Included paths cannot traverse links or reparse points.")
+            selected.extend(Path(directory) / name for name in names
+                            if (name.casefold() if os.name == 'nt' else name).endswith('.md')
+                            and name.casefold() not in PROTECTED)
     files = {}
     for path in selected:
         if not path.is_relative_to(root):
@@ -141,8 +159,8 @@ def initial_files(root, includes):
             if includes:
                 raise ProductError(3, "target_invalid", "Protected hidden/legacy state cannot be imported as knowledge.")
             continue
-        if path.is_symlink() or not path.resolve().is_relative_to(root) or any(p.is_symlink() for p in path.parents if p != root.parent):
-            raise ProductError(3, "target_invalid", "Included files cannot use symbolic links.")
+        if unsafe_ancestor(path) is not None or not path.resolve().is_relative_to(root):
+            raise ProductError(3, "target_invalid", "Included files cannot use symbolic links or reparse points.")
         if not path.is_file() or path.stat().st_size > 10 * 1024 * 1024:
             raise ProductError(3, "target_invalid", "Included files must be regular UTF8 files no larger than 10 MiB.")
         files[relative.as_posix()] = path.read_bytes().decode("utf-8")
@@ -161,7 +179,7 @@ def write_manifest(root, project_id, provider):
     metadata = {"format_version": 1, "protocol": 1, "project_id": project_id,
                 "product_version": PRODUCT_VERSION, "provider": provider}
     path = root / MANIFEST
-    if path.exists() or path.is_symlink():
+    if path.exists() or is_link_or_reparse(path):
         current = project_manifest(root)
         if current["project_id"] != project_id or current["provider"] != provider:
             raise ProductError(3, "project_mismatch", "Existing project identity/provider cannot be replaced while joining.")
@@ -180,6 +198,8 @@ def connect(state, token_file=None):
     if token_file is not None and not str(token_file).strip():
         raise ProductError(2, "usage_error", "An explicit credential path must not be empty.")
     credential = state / "member.token" if token_file is None else token_file
+    if unsafe_ancestor(credential) is not None:
+        raise ProductError(3, "state_path_unsafe", "Credential paths cannot traverse links or reparse points.")
     config = json_file(state / "connection.json")
     if not isinstance(config, dict) or config.get("protocol") != 1:
         raise ProductError(3, "connection_invalid", "Unsupported private connection configuration.")
@@ -206,8 +226,8 @@ def _publish_setup_bytes(path, data):
     """Durably publish a complete new file without replacing an existing one."""
     from .client import _fsync_dir
     path = Path(path)
-    if path.is_symlink():
-        raise ProductError(3, "setup_invalid", "Setup cannot replace a symbolic link.")
+    if unsafe_ancestor(path) is not None:
+        raise ProductError(3, "setup_invalid", "Setup cannot traverse a symbolic link or reparse point.")
     fd, temporary = tempfile.mkstemp(prefix=".setup-write-", dir=path.parent)
     try:
         with os.fdopen(fd, "wb") as stream:
@@ -230,6 +250,7 @@ def _publish_setup_json(path, value):
 def _setup_lock(state):
     """OS lock survives no process; competing setup waits at most five seconds."""
     from .client import _fsync_dir
+    state = private_path(state)
     state.mkdir(mode=0o700, parents=True, exist_ok=True)
     path = private_path(state / SETUP_LOCK)
     # Publish complete immutable magic before the inode can be opened/locked.
@@ -386,6 +407,10 @@ def _initial_authority(state, intent):
 def _setup(root, state, args):
     from .client import Client, _snapshot
     from .engine import files_hash, validate_files, identifier, text
+    # Reject managed junctions before setup creates its lock, intent, credential,
+    # authority or manifest. This inventory reads no project file contents.
+    for _ in Client(root, state / 'client', None)._walk():
+        pass
     if args.command == "init":
         # Reject uncorrectable owner/intent values before publishing an immutable
         # setup record or creating any private state.

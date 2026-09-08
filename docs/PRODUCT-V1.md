@@ -26,6 +26,14 @@ upload or prove which transport delivered them. Use one storage authority per
 project. Google Drive, OneDrive and iCloud routes require separate account/client/
 OS testing; vendor-folder routes on Linux are not claimed supported.
 
+Use the physical selected folder and private state paths. Managed entries must be
+ordinary locally available files and directories. Symbolic links and Windows
+reparse points, including directory junctions, are refused before traversal;
+protected runtime/configuration directories remain excluded. A cloud placeholder
+that is a reparse point is not accepted merely because the provider displays it
+as a file. These checks do not provide an OS lock against concurrent replacement
+of filesystem paths. Actual provider compatibility still needs its own trial.
+
 Anyone holding a member token has that member's rights. Tokens prove membership,
 not the real-world identity or factual correctness of the person using them. Keep
 tokens outside shared files and send them only through a separately approved private

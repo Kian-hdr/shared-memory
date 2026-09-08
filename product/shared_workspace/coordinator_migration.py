@@ -18,6 +18,7 @@ import uuid
 from .engine import Coordinator, canonical, digest, identifier
 from .errors import ProductError
 from .workflow import private_path
+from .path_safety import absolute_path, unsafe_ancestor
 
 LOCK_WAIT_MS = 2000
 BACKUP_TIMEOUT_SECONDS = 60
@@ -221,7 +222,10 @@ def _backup_path(value, engine):
 
 
 def _verify_backup(destination, expected_project_id, expected_checkpoint, expected_hash=None):
-    if not destination.is_file() or destination.is_symlink():
+    if unsafe_ancestor(destination) is not None:
+        _fail("The retained migration backup is missing or unsafe.")
+    destination = absolute_path(destination)
+    if not destination.is_file():
         _fail("The retained migration backup is missing or unsafe.")
     hashed = _file_hash(destination)
     if expected_hash is not None and hashed != expected_hash:
@@ -231,7 +235,8 @@ def _verify_backup(destination, expected_project_id, expected_checkpoint, expect
         check.execute("BEGIN")
         result = verify_checkpoint(check, backup_engine, expected_schema=1,
                                    expected_project_id=expected_project_id)
-    if result["checkpoint"] != expected_checkpoint or _file_hash(destination) != hashed:
+    if (result["checkpoint"] != expected_checkpoint or unsafe_ancestor(destination) is not None
+            or _file_hash(destination) != hashed):
         _fail("Backup history differs from the verified migration checkpoint.")
     return hashed
 

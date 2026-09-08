@@ -16,6 +16,7 @@ from . import knowledge
 from .client import Client, _hash, _snapshot, _draft_coordination, _io_errors, _absolute
 from .engine import PROTECTED, validate_path, validate_files, files_hash
 from .errors import ProductError
+from .path_safety import unsafe_ancestor
 
 COMMANDS = ('graph-rename-plan', 'graph-rename-draft', 'graph-rename-apply')
 BOUNDARY = 'Only selected-folder links are checked; outer-vault backlinks are unknown and are not read or updated.'
@@ -377,13 +378,23 @@ def add_commands(commands):
             cmd.add_argument('--coordination-file')
 
 
+def _selected_root(value):
+    # Inspect the caller's spelling before resolution can hide a junction. Then
+    # match setup's canonical Windows casing/8.3 expansion for exact state binding.
+    raw = Path(value).expanduser()
+    if unsafe_ancestor(raw) is not None:
+        raise ProductError(3, 'knowledge_root', 'The selected graph root cannot use symlinks or reparse points.')
+    guarded = knowledge._absolute(raw)
+    return knowledge._absolute(guarded.resolve())
+
+
 def dispatch(bundle, args):
     from .workflow import private_path, project_manifest, json_file, connect
     for field in ('coordination_file', 'session_token_file'):
         value = getattr(args, field, None)
         if value is not None and not value.strip():
             raise ProductError(2, 'usage_error', 'An explicit private input path must not be empty.')
-    root = knowledge._absolute(Path(args.project).expanduser())
+    root = _selected_root(args.project)
     _private_guard(Path(args.state_dir).expanduser().absolute())
     state = private_path(args.state_dir, root)
     _private_guard(state / 'client/client.json')
