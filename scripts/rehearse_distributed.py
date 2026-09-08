@@ -106,7 +106,7 @@ class Session:
         self.args = args
         self.root = Path(args.output).absolute()
         check(not self.root.exists(), 'Choose a fresh nonexistent fixture output')
-        self.root.mkdir(parents=True)
+        self.root.mkdir(parents=True, mode=0o700)
         self.package = Path(args.package).absolute()
         self.deadline = time.monotonic() + args.seconds
         self.commands = []
@@ -117,7 +117,10 @@ class Session:
         self.report = {'status': 'failed', 'role': role,
             'system': platform.system(), 'platform_release': platform.release(),
             'python': platform.python_version(), 'run_id': identity()[0], 'attempt': identity()[1],
-            'limitations': LIMITS, 'commands': self.commands}
+            'limitations': LIMITS, 'commands': self.commands,
+            'coordination_schema': args.coordination_schema}
+        self.session_token = None
+        self.actor = role
         self.project = self.root / ('Private space ' + role) / 'Projects' / 'Shared project'
         self.state = self.root / 'private-state'
 
@@ -139,12 +142,16 @@ class Session:
         command = [sys.executable, str(self.package), *map(str, arguments)]
         result = subprocess.run(command, capture_output=True, encoding='utf-8',
             env=clean_environment(), timeout=min(40, self.remaining()))
+        check(len(result.stdout.encode('utf-8')) + len(result.stderr.encode('utf-8')) <= 2 * 1024 * 1024,
+              'CLI response exceeds the rehearsal output limit')
         try:
             envelope = json.loads(result.stdout)
         except (ValueError, UnicodeError):
             raise CheckFailed('CLI returned invalid JSON for ' + str(arguments[0])) from None
         self.commands.append({'command': str(arguments[0]), 'exit_code': result.returncode,
-                              'code': envelope.get('code')})
+                              'code': envelope.get('code'), 'expected_exit': expected})
+        if arguments[0] == 'coord':
+            self.commands[-1]['operation'] = str(arguments[4])
         check(result.returncode == expected, 'Unexpected CLI outcome for ' + str(arguments[0])
               + ': ' + str(result.returncode) + '/' + str(envelope.get('code')))
         return envelope['data']
@@ -152,10 +159,11 @@ class Session:
     def local(self, operation, *arguments, expected=0):
         return self.cli(operation, self.project, '--state-dir', self.state, *arguments, expected=expected)
 
-    def coord(self, operation, payload=None, expected=0):
+    def coord(self, operation, payload=None, expected=0, membership=False):
         path = self.root / 'private-payload.json'
         write_json(path, payload or {})
-        return self.local('coord', operation, '--payload-file', path, expected=expected)
+        options = ['--session-token-file', self.session_token] if self.session_token and not membership else []
+        return self.local('coord', operation, '--payload-file', path, *options, expected=expected)
 
     def version(self):
         metadata = self.cli('version')
@@ -186,18 +194,28 @@ class Session:
             handle.close()
         self.report['processes_stopped'] = all(process.poll() is not None for process in self.children)
         self.report['last_phase'] = self.phase
+        self.report['commands_checked'] = len(self.commands)
+        self.report['expected_refusals'] = sum(item['expected_exit'] != 0 for item in self.commands)
+        serialized = canonical(self.report)
+        check(str(self.root).encode() not in serialized, 'Report contains a private host path')
+        for token in self.root.rglob('*.token'):
+            check(token.read_bytes().strip() not in serialized, 'Report contains a private credential')
         write_json(self.root / 'report.json', self.report)
 
 
 def claim(session, name, target):
+    if session.args.coordination_schema == 2:
+        plan2(session, name, target)
+        return acquire2(session, name, session.local('receipt'))
     return session.coord('claim', {'assignment_id': name, 'targets': [target],
         'criteria': ['Verify exact synthetic bytes and current receipt'], 'dependencies': [],
         'resource_limits': {'max_proposals': 4}, 'integration_owner': 'coordinator'})
 
 
 def complete(session, assignment, receipt):
+    extra = {'coordination': context2(session, assignment)} if session.args.coordination_schema == 2 else {}
     return session.coord('complete', {'assignment_id': assignment, 'revision': receipt['revision'],
-        'files_hash': receipt['files_hash'], 'evidence': 'Automated runner verified exact synthetic snapshot bytes'})
+        'files_hash': receipt['files_hash'], 'evidence': 'Automated runner verified exact synthetic snapshot bytes', **extra})
 
 
 def assignments(session):
@@ -209,20 +227,191 @@ def all_marked(session, prefix):
     return all(current.get(prefix + role, {}).get('status') == 'completed' for role in ROLES)
 
 
+def session2(session, role):
+    policy = session.coord('policy')
+    grants = session.root / 'private-grants.json'
+    write_json(grants, {'ttl_seconds': 1200, 'scopes': policy['policy']['session_scopes'][role], 'targets': ['.']})
+    opened = session.local('session-create', '--session-id', session.actor + '-run', '--grants-file', grants)
+    check(opened['credential_saved'] and opened['session']['actor'] == session.actor,
+          'Session credential belongs to another actor')
+    check(opened['session']['person_id'] == 'person-' + session.actor
+          and opened['session']['agent_id'] == 'agent-' + session.actor,
+          'Session person or agent binding differs')
+    session.session_token = session.state / 'sessions' / (session.actor + '-run') / 'session.token'
+    check(session.session_token.read_bytes() != (session.state / 'member.token').read_bytes(),
+          'Membership and session credentials must differ')
+    check(session.coord('status')['coordination']['schema_version'] == 2, 'Schema2 authority required')
+    session.report['session_identity'] = {'actor': session.actor, 'session_id': session.actor + '-run',
+                                        'credential_source': 'own-membership-session-create'}
+
+
+def context2(session, assignment):
+    item = session.coord('assignment', {'assignment_id': assignment})
+    return {'session_id': session.actor + '-run', 'generation': item['generation'],
+            'input_hash': item['input_hash'], 'policy_revision': session.coord('policy')['policy_revision']}
+
+
+def plan2(session, name, target):
+    return session.coord('plan', {'assignment_id': name, 'outcome_key': name,
+        'summary': 'Verify synthetic outcome ' + name, 'targets': [target],
+        'criteria': ['Exact bytes and current accepted receipt'], 'dependencies': [], 'interface_paths': [],
+        'resource_limits': {'max_proposals': 4, 'max_files': 1, 'max_bytes': 4096},
+        'integration_owner': 'coordinator', 'policy_revision': session.coord('policy')['policy_revision']})
+
+
+def acquire2(session, assignment, receipt, expected=0):
+    context = context2(session, assignment)
+    return session.coord('acquire', {'assignment_id': assignment, 'expected_generation': context['generation'],
+        'ttl_seconds': 900, 'revision': receipt['revision'], 'files_hash': receipt['files_hash'],
+        'policy_revision': context['policy_revision']}, expected=expected)
+
+
+def draft2(session, proposal, assignment):
+    path = session.root / 'private-draft-context.json'
+    write_json(path, context2(session, assignment))
+    return session.local('draft', '--proposal-id', proposal, '--assignment-id', assignment,
+        '--evidence', 'Automated actor compared exact synthetic UTF8 result', '--coordination-file', path)
+
+
+def submit2(session, proposal, expected=0):
+    return session.local('submit', '--proposal-id', proposal, '--session-token-file', session.session_token,
+                         expected=expected)
+
+
+def continued_files(role):
+    return {**expected_files(), 'Results/macos.md': result_text('continued-by-' + role)}
+
+
+def handoff2(session, recipient, receipt):
+    before = session.coord('snapshot')
+    check(receipt['revision'] == before['revision'] and receipt['files_hash'] == before['files_hash'],
+          'Origin receipt was not current before handoff')
+    target = session.project / 'Results/macos.md'
+    target.write_bytes(b'# Preserved stale origin proposal\n')
+    proposal = 'stale-' + session.actor
+    draft2(session, proposal, 'work-macos')
+    draft = session.state / 'client/drafts' / (proposal + '.json')
+    frozen = draft.read_bytes()
+    check(json.loads(frozen)['base_revision'] == before['revision'], 'Stale origin draft was already behind')
+    session.coord('handoff', {'assignment_id': 'work-macos', 'to_actor': recipient,
+        'summary': 'Continue exact synthetic result with your own session',
+        'coordination': context2(session, 'work-macos')})
+    submit2(session, proposal, expected=4)
+    check(session.coord('snapshot') == before, 'Refused origin submission changed accepted history')
+    check(proposal not in {item['id'] for item in session.coord('status')['proposals']},
+          'Stale origin proposal persisted')
+    check(draft.read_bytes() == frozen, 'Stale origin draft was changed')
+    marker = 'fenced-' + session.actor
+    claim(session, marker, 'Barriers/' + session.actor + '.md')
+    complete(session, marker, receipt)
+    session.report['stale_origin_refusal'] = {'base_revision': before['revision'],
+        'accepted_revision_unchanged': True, 'proposal_absent': True, 'draft_sha256': sha(draft)}
+    return draft, frozen
+
+
+def client_handoff2(session, initial, common):
+    role = session.actor
+    preserved = None
+    if role == 'macos':
+        session.poll('all_receipts_before_handoff', lambda: all_marked(session, 'receipt-'))
+        preserved = handoff2(session, 'windows', common)
+    else:
+        origin = 'macos' if role == 'windows' else 'windows'
+        def fenced():
+            item = session.coord('assignment', {'assignment_id': 'work-macos'})
+            marker = assignments(session).get('fenced-' + origin, {})
+            return item.get('designated_actor') == role and item['status'] == 'ready' and marker.get('status') == 'completed'
+        session.poll('fenced_incoming_handoff', fenced)
+        before = session.coord('snapshot')
+        acquire2(session, 'work-macos', initial if role == 'windows' else common, expected=4)
+        check(session.coord('snapshot') == before, 'Stale recipient receipt changed accepted snapshot')
+        inbox = session.coord('inbox', {'limit': 1000})
+        notices = [item for item in inbox['messages'] if item['kind'] == 'handoff'
+                   and item['assignment_id'] == 'work-macos' and item['to_actor'] == role]
+        check(notices and not inbox['has_more'], 'Expected bounded addressed handoff notice')
+        ack = session.coord('ack', {'message_id': notices[-1]['message_id']})
+        check(ack['acknowledged'] and ack['acknowledged_by'] == role + '-run', 'Recipient acknowledgment mismatch')
+        session.local('refresh')
+        receipt = session.local('receipt')
+        check(receipt['readiness'] == 'ready' and receipt['revision'] == before['revision']
+              and receipt['files_hash'] == before['files_hash'], 'Recipient receipt differs from handoff snapshot')
+        lease = acquire2(session, 'work-macos', receipt)
+        check(lease['actor'] == role and lease['lease']['session_id'] == role + '-run', 'Recipient lease actor mismatch')
+        (session.project / 'Results/macos.md').write_bytes(continued_files(role)['Results/macos.md'].encode())
+        proposal = 'continue-' + role
+        draft2(session, proposal, 'work-macos')
+        submit2(session, proposal)
+        expected_revision = 4 if role == 'windows' else 5
+        session.poll('accepted_continuation', lambda: session.coord('status')['revision'] == expected_revision)
+        session.local('refresh')
+        receipt = session.local('receipt')
+        check(receipt['revision'] == expected_revision and receipt['readiness'] == 'ready', 'Continuation receipt incomplete')
+        if role == 'windows':
+            preserved = handoff2(session, 'linux', receipt)
+        else:
+            complete(session, 'work-macos', receipt)
+        session.report.update(stale_recipient_receipt_rejected=True,
+            handoff_ack={'message_id': ack['message_id'], 'acknowledged_by': ack['acknowledged_by']},
+            acquired_generation=lease['generation'])
+    session.poll('schema2_handoff_complete', lambda: session.coord('assignment',
+        {'assignment_id': 'work-macos'})['status'] == 'completed')
+    session.local('refresh')
+    final = session.local('receipt')
+    snapshot = session.coord('snapshot')
+    check(final['readiness'] == 'ready' and final['revision'] == 5 and final['files_hash'] == snapshot['files_hash'],
+          'Final schema2 receipt mismatch')
+    check(snapshot['files'] == continued_files('linux'), 'Final schema2 snapshot content differs')
+    for name, content in continued_files('linux').items():
+        check((session.project / name).read_bytes() == content.encode(), 'Final schema2 materialization differs')
+    if preserved:
+        check(preserved[0].read_bytes() == preserved[1], 'Origin draft changed during later refresh')
+    return final
+
+
+def coordinator_handoff2(session, accepted_results):
+    for role, base in (('windows', 3), ('linux', 4)):
+        proposal_id = 'continue-' + role
+        session.poll('recipient_proposal_' + role, lambda: proposal_id in
+                     {item['id'] for item in session.coord('status')['proposals']})
+        proposal = session.coord('proposal', {'proposal_id': proposal_id})
+        check(proposal['actor'] == role and proposal['base_revision'] == base
+              and proposal['changes'] == {'Results/macos.md': continued_files(role)['Results/macos.md']}
+              and proposal['coordination']['session_id'] == role + '-run', 'Recipient proposal context/content mismatch')
+        result = session.coord('accept', {'proposal_id': proposal_id,
+            'validation': 'Compared exact expected continuation and own producer session',
+            'reason': 'Bounded synthetic handoff continuation', 'coordination': context2(session, 'work-macos')})
+        check(result['accepted'] and result['revision'] == base + 1, 'Continuation acceptance failed')
+        accepted_results.append(result)
+    session.poll('schema2_all_clients_done', lambda: all_marked(session, 'done-'))
+    snapshot = session.coord('snapshot')
+    handoff = session.coord('assignment', {'assignment_id': 'work-macos'})
+    check(snapshot['files'] == continued_files('linux') and snapshot['revision'] == 5, 'Final accepted schema2 bytes differ')
+    check(handoff['status'] == 'completed' and handoff['actor'] == 'linux', 'Final schema2 work did not complete')
+    check([(item['from_actor'], item['to_actor']) for item in handoff['handoffs']]
+          == [('macos', 'windows'), ('windows', 'linux')], 'Schema2 handoff sequence differs')
+    check(len(session.coord('status')['proposals']) == 5, 'Rejected stale proposal persisted')
+    session.report.update(status='passed', revision=5, files_hash=snapshot['files_hash'],
+        accepted_proposals=accepted_results, handoff=handoff['handoffs'],
+        completed_generation=handoff['generation'])
+
+
 def sign_rendezvous(document):
     return hmac.new(bytes.fromhex(derive('rendezvous')), canonical(document), hashlib.sha256).hexdigest()
 
 
-def verified_rendezvous(document):
+def verified_rendezvous(document, coordination_schema=None):
     public = document['data']
     check(hmac.compare_digest(document['signature'], sign_rendezvous(public)), 'Rendezvous signature mismatch')
     check((public['run_id'], public['attempt']) == identity(), 'Rendezvous belongs to a different run/attempt')
     if os.environ.get('GITHUB_ACTIONS') == 'true':
         check(public['source_revision'] == os.environ.get('GITHUB_SHA'), 'Rendezvous source differs from this workflow commit')
+    check(public.get('coordination_schema') in (1, 2), 'Rendezvous coordination schema is invalid')
+    if coordination_schema is not None:
+        check(public['coordination_schema'] == coordination_schema, 'Rendezvous coordination schema mismatch')
     return public
 
 
-def receive_artifact(content, package_path):
+def receive_artifact(content, package_path, coordination_schema=None):
     """Verify signed scope and exact downloaded bytes before writing/execution."""
     check(len(content) <= MAX_ARTIFACT_BYTES, 'Rendezvous artifact exceeds4 MiB')
     with zipfile.ZipFile(io.BytesIO(content)) as archive:
@@ -234,7 +423,7 @@ def receive_artifact(content, package_path):
         check(sum(item.file_size for item in archive.infolist()) <= MAX_ARTIFACT_BYTES,
               'Uncompressed artifact exceeds4 MiB')
         document = json.loads(archive.read('rendezvous.json'))
-        public = verified_rendezvous(document)
+        public = verified_rendezvous(document, coordination_schema)
         package = archive.read('shared-memory.pyz')
     check(hashlib.sha256(package).hexdigest() == public['package_sha256'], 'Downloaded package hash mismatch')
     descriptor = os.open(package_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_NOFOLLOW', 0), 0o600)
@@ -252,10 +441,15 @@ def coordinator(session):
     project_id = str(uuid.uuid4())
     owner_token = derive('coordinator')
     authority.initialize(project_id, {'actor': 'coordinator', 'human': 'Automated coordinator',
-        'agent': 'Synthetic CI rehearsal'}, owner_token, INITIAL)
+        'agent': 'Synthetic CI rehearsal'}, owner_token, INITIAL,
+        coordination={'person_id': 'person-coordinator', 'agent_id': 'agent-coordinator',
+                      'policy': {'max_lease_seconds': 900}} if session.args.coordination_schema == 2 else None)
     for role in ROLES:
         authority.request(owner_token, 'member', {'actor': role, 'human': 'Automated ' + role,
             'agent': 'Synthetic CI rehearsal', 'role': 'contributor', 'token': derive(role)})
+        if session.args.coordination_schema == 2:
+            authority.request(owner_token, 'member-binding', {'actor': role,
+                'person_id': 'person-' + role, 'agent_id': 'agent-' + role})
     token_file = session.root / 'owner.token'
     private_token(token_file, owner_token)
     with socket.socket() as sock:
@@ -275,6 +469,8 @@ def coordinator(session):
     session.project.mkdir(parents=True)
     session.local('attach', '--endpoint', loopback, '--token-file', token_file,
                   '--expected-project-id', project_id)
+    if session.args.coordination_schema == 2:
+        session2(session, 'owner')
     endpoint = loopback
     if not session.args.loopback:
         check(session.args.cloudflared is not None, 'A verified cloudflared executable is required')
@@ -301,7 +497,7 @@ def coordinator(session):
                 raise
         session.poll('verified_https_readiness', reachable)
     public = {'run_id': identity()[0], 'attempt': identity()[1], 'project_id': project_id,
-        'endpoint': endpoint, 'base_revision': 0, 'package_sha256': sha(session.package),
+        'endpoint': endpoint, 'base_revision': 0, 'coordination_schema': session.args.coordination_schema, 'package_sha256': sha(session.package),
         'source_revision': metadata['source_revision'], 'bundle_id': metadata['bundle_id']}
     published_package = session.root / 'shared-memory.pyz'
     published_package.write_bytes(session.package.read_bytes())
@@ -318,14 +514,23 @@ def coordinator(session):
         check(proposal['changes'] == {'Results/' + role + '.md': result_text(role)},
               'Synthetic proposal bytes differ from the reviewed expectation')
         check(proposal['claims'] == [], 'Unexpected semantic claims in fixture')
+        if session.args.coordination_schema == 2:
+            context = context2(session, 'work-' + role)
+            context['session_id'] = role + '-run'
+            check(proposal['coordination'] == context and context['generation'] == 1,
+                  'Common-base proposal lease/session context differs')
+        extra = {'coordination': context2(session, 'work-' + role)} if session.args.coordination_schema == 2 else {}
         accepted_results.append(session.coord('accept', {'proposal_id': 'proposal-' + role,
             'validation': 'Coordinator compared exact expected synthetic UTF8 content',
-            'reason': 'Accept independent bounded common-base proposal'}))
+            'reason': 'Accept independent bounded common-base proposal', **extra}))
     check([result['revision'] for result in accepted_results] == [1, 2, 3], 'Unexpected accepted revisions')
     check(all(result['rebased'] for result in accepted_results[1:]), 'Compatible stale proposals did not rebase')
     snapshot = session.coord('snapshot')
     check(snapshot['files'] == expected_files(), 'Final coordinator snapshot mismatch')
     session.poll('all_os_receipts', lambda: all_marked(session, 'receipt-'))
+    if session.args.coordination_schema == 2:
+        coordinator_handoff2(session, accepted_results)
+        return
     session.poll('handoff_and_all_clients_done', lambda: all_marked(session, 'done-'))
     handoff = session.coord('assignment', {'assignment_id': 'work-macos'})
     check(handoff['status'] == 'completed' and handoff['actor'] == 'linux', 'Final handoff did not complete')
@@ -374,7 +579,7 @@ def artifact_rendezvous(session):
             response = urllib.request.urlopen(location, timeout=min(20, session.remaining()))
         with response:
             content = response.read(MAX_ARTIFACT_BYTES + 1)
-        return receive_artifact(content, session.package)
+        return receive_artifact(content, session.package, session.args.coordination_schema)
     return session.poll('rendezvous_artifact', find)
 
 
@@ -388,7 +593,7 @@ def client(session):
         document = session.poll('local_rendezvous', lambda: json.loads(path.read_text()) if path.is_file() else None)
     else:
         document = artifact_rendezvous(session)
-    public = verified_rendezvous(document)
+    public = verified_rendezvous(document, session.args.coordination_schema)
     check(sha(session.package) == public['package_sha256'], 'Rendezvous/runtime package hash mismatch')
     # No downloaded package executes until HMAC, run, attempt, source and bytes
     # have been checked. Version then verifies the embedded build/bundle identity.
@@ -416,17 +621,25 @@ def client(session):
     private_token(token_file, derive(role))
     session.local('attach', '--endpoint', endpoint, '--token-file', token_file,
         '--expected-project-id', public['project_id'])
+    if session.args.coordination_schema == 2:
+        session2(session, 'contributor')
+    initial_receipt = session.local('receipt')
     claim(session, 'work-' + role, 'Results/' + role + '.md')
     target = session.project / 'Results' / (role + '.md')
     target.parent.mkdir(exist_ok=True)
     target.write_bytes(result_text(role).encode())
-    session.local('draft', '--proposal-id', 'proposal-' + role, '--assignment-id', 'work-' + role,
-                  '--evidence', 'Automated OS actor compared exact synthetic UTF8 result')
-    session.local('submit', '--proposal-id', 'proposal-' + role)
+    if session.args.coordination_schema == 2:
+        draft2(session, 'proposal-' + role, 'work-' + role)
+        submit2(session, 'proposal-' + role)
+    else:
+        session.local('draft', '--proposal-id', 'proposal-' + role, '--assignment-id', 'work-' + role,
+                      '--evidence', 'Automated OS actor compared exact synthetic UTF8 result')
+        session.local('submit', '--proposal-id', 'proposal-' + role)
     session.poll('common_accepted_revision', lambda: session.coord('status')['revision'] == 3)
     session.local('refresh')
     receipt = session.local('receipt')
     check(receipt['readiness'] == 'ready' and receipt['revision'] == 3, 'Local accepted receipt is incomplete')
+    session.report['common_base_receipt'] = {key: receipt[key] for key in ('revision', 'files_hash', 'readiness')}
     snapshot = session.coord('snapshot')
     check(snapshot['files'] == expected_files() and snapshot['files_hash'] == receipt['files_hash'],
           'Common snapshot/receipt differs')
@@ -436,7 +649,9 @@ def client(session):
         complete(session, 'work-' + role, receipt)
     claim(session, 'receipt-' + role, 'Receipts/' + role + '.md')
     complete(session, 'receipt-' + role, receipt)
-    if role == 'macos':
+    if session.args.coordination_schema == 2:
+        receipt = client_handoff2(session, initial_receipt, receipt)
+    elif role == 'macos':
         session.poll('all_receipts_before_handoff', lambda: all_marked(session, 'receipt-'))
         session.coord('handoff', {'assignment_id': 'work-macos', 'to_actor': 'windows',
                                  'summary': 'Automated macOS to Windows handoff'})
@@ -485,7 +700,7 @@ def selfcheck(args):
         for role in ('coordinator', *ROLES):
             command = [sys.executable, __file__, 'coordinator' if role == 'coordinator' else 'client',
                 '--package', str(Path(args.package).absolute()), '--output', str(root / role),
-                '--seconds', str(args.seconds), '--loopback']
+                '--seconds', str(args.seconds), '--coordination-schema', str(args.coordination_schema), '--loopback']
             if role != 'coordinator':
                 command += ['--role', role, '--rendezvous', str(root / 'coordinator' / 'rendezvous.json')]
             handle = (root / (role + '.private.log')).open('wb'); handles.append(handle)
@@ -497,9 +712,12 @@ def selfcheck(args):
         check(all(report['status'] == 'passed' for report in reports), 'Selfcheck report failed')
         check(len({(report['project_id'], report['revision'], report['files_hash']) for report in reports}) == 1,
               'Selfcheck actors disagree on accepted identity')
+        check(len({(report['package_sha256'], report['bundle_id'], report['source_revision'],
+                    report['coordination_schema']) for report in reports}) == 1,
+              'Selfcheck actors disagree on signed package/schema identity')
         write_json(root / 'report.json', {'status': 'passed', 'scope': 'one-machine-loopback-selfcheck',
             'limitations': LIMITS + ['OS role names are simulated on this one local operating system'],
-            'actors': reports})
+            'coordination_schema': args.coordination_schema, 'actors': reports})
     finally:
         for process in children:
             if process.poll() is None:
@@ -522,6 +740,8 @@ def main():
     parser.add_argument('--rendezvous')
     parser.add_argument('--loopback', action='store_true', help='Explicit local selfcheck only')
     parser.add_argument('--seconds', type=int, default=720)
+    parser.add_argument('--coordination-schema', type=int, choices=(1, 2), default=1,
+                        help='Opt in to real session and generation fencing; default preserves schema 1')
     parser.add_argument('--file')
     parser.add_argument('--require-passed', action='store_true')
     args = parser.parse_args()
@@ -560,4 +780,5 @@ def main():
 
 
 if __name__ == '__main__':
+    os.umask(0o077)
     raise SystemExit(main())

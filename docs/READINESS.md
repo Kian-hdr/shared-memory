@@ -176,8 +176,8 @@ provider/recipient/mixed-device gates are unavailable.
 
 ## Approved autonomous coordination and graph extension, 2026-09-08
 
-These accepted requirements extend the current implementation. They are not passed
-capabilities. Keep private development until finished V1 and retain TEAM-01–TEAM-11.
+These accepted requirements define the extension acceptance contract. Implementation
+and evidence are tracked separately; listing a requirement does not mark it passed. Keep private development until finished V1 and retain TEAM-01–TEAM-11.
 
 Autonomy is primary: discover available setup details and ask only for essential
 undiscoverable folder/execution/membership/budget/constraint choices. Routine work
@@ -196,8 +196,9 @@ limits, confidentiality and mandatory platform/authentication controls still app
   claims and detect existing equivalent outcome requests. Likely semantic duplicates
   are review signals, not proof of perfect duplicate detection.
 - Extend planning to a queued/ready dependency graph with explicit input/interface
-  revisions and invalidation. The current completed-dependencies-only claim rule
-  does not satisfy this. Workers may proceed against agreed interfaces while
+  revisions and invalidation. The historical schema-1 completed-dependencies-only
+  claim rule did not satisfy this; schema 2 implements separate pinned output and
+  published-interface dependencies. Workers may proceed against agreed interfaces while
   implementation and tests develop independently.
 - Isolate worktrees/proposal areas and integrate under recorded authority. Renewable
   ownership leases and generation/fencing tokens prevent reassigned old sessions
@@ -229,8 +230,10 @@ never belong in notes. Notes and graph metadata do not silently grant policy aut
 Validate actual graph/navigation behavior in an isolated Obsidian fixture before
 claiming UI compatibility. YAML/link checks alone are insufficient. This does not
 require a new production vault or authorize migration of the live Vault. A bounded
-read-only graph analyser is the first implementation step; safe rename/move and
-native UI verification remain distinct follow-up acceptance work.
+read-only graph analyser was the first implementation step. The isolated native
+Obsidian graph/navigation check has separate captured evidence. Safe scoped
+rename/move remains an implementation gate: the native rename also updated an
+outer-fixture backlink and therefore did not establish GRAPH-02 isolation.
 
 | Extension gate | Required observable result |
 | --- | --- |

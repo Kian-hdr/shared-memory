@@ -1,7 +1,9 @@
 # Shared Memory real-device acceptance runbook
 
 Prepared 2026-09-08. **Not executed.** This procedure gathers the missing TEAM
-release evidence. It does not authorize deployment, sharing, account changes,
+release evidence for the schema-2 product. Schema-1 rehearsals are historical
+compatibility evidence and do not pass the session/coordination extension gates.
+It does not authorize deployment, sharing, account changes,
 credential delivery or publication. Use only disposable public/synthetic project
 content. Do not use the live Exlumina Vault or backup drives.
 
@@ -20,11 +22,15 @@ provider access and independently issued membership tokens. Never copy private
 client state or tokens as project content. Keep private locators/credentials out of
 shared reports. No participants or deployment have been arranged by this runbook.
 
-Select a provider/account/OS route explicitly. Windows/macOS vendor-folder tests
+Select a provider/account/OS route explicitly and record whether bytes travel
+through a vendor-synchronized folder or the explicit revision-delivery adapter. Windows/macOS vendor-folder tests
 may exercise Google Drive, OneDrive or iCloud only with verified account/client
-support. The current vendor-desktop routes are blocked on Linux; do not label an
-HTTPS-only Linux run as a passed vendor-provider integration. A separately supported
-self-hosted storage route needs its own actual file-delivery evidence. Coordinator
+support. Vendor-desktop routes without supported Linux clients cannot establish Linux
+provider acceptance. The implemented rclone Google Drive revision adapter is a
+separate route requiring independently authorized private configuration and actual
+account delivery evidence on each OS. Its local-backend fixtures are not Drive
+proof. Do not label coordinator HTTPS alone as provider delivery. A self-hosted
+storage route also needs its own actual file-delivery evidence. Coordinator
 HTTPS receipt and storage-provider receipt are different observations.
 
 ## Owner setup and independent joins: TEAM-01/02
@@ -33,7 +39,9 @@ HTTPS receipt and storage-provider receipt are different observations.
    `.obsidian` fixture settings, plus the selected project subfolder. Hash the
    parent/sibling/settings files before setup. Obsidian need not run.
 2. Owner uses `init PROJECT --state-dir PRIVATE_STATE --person PERSON --actor ACTOR
-   --agent AGENT --purpose PURPOSE --mode team --provider PROVIDER`. Record the
+   --agent AGENT --purpose PURPOSE --mode team --provider PROVIDER
+   --coordination-file PRIVATE_CONFIG`. Use the schema-2 person/agent/policy config
+   in the [operating guide](PRODUCT-V1.md#session-based-coordination). Record the
    returned UUID, accepted revision/hash and actual package identity.
 3. The authorized host exposes the actual packaged coordinator with verified TLS,
    preserving its database locally. Use the operating guide's `serve` procedure.
@@ -44,19 +52,35 @@ HTTPS receipt and storage-provider receipt are different observations.
    provider explicitly; omitted `--provider` currently means local and an existing
    manifest with another provider is rejected. Use `--ca-file` only for the reviewed
    trust chain, never disable certificate verification.
-5. Each participant independently verifies `team-status` and `receipt`. Compare
+5. Bind each member to its distinct person/agent IDs using authenticated
+   `member-binding`. Each running worker independently creates its own
+   `session-create` credential with explicit operation, target and lifetime grants.
+   Record session IDs and grant summaries, never tokens. Other actors obtain their
+   own credentials; delegation cannot authenticate as another actor. Use the returned
+   private session file with `--session-token-file` for work operations.
+6. Each participant independently verifies `team-status` and `receipt`. Compare
    UUID/revision/files_hash across devices and re-hash untouched parent/settings.
    Capture mismatches or partial results rather than replacing them with ready.
 
 ## Work, conflict and handoff: TEAM-03/04/05/06
 
 Use `coord PROJECT --state-dir PRIVATE_STATE OPERATION --payload-file PRIVATE_JSON`
-with the payloads in the candidate's engine contract. Save each command's JSON
+with the authenticated session and schema-2 payloads in the candidate's
+[engine contract](../product/ENGINE-CONTRACT.md) and
+[operating guide](PRODUCT-V1.md#session-based-coordination). Save each command's JSON
 output, exit code and time without credential values.
 
-- Each distinct actor claims different declared note targets. Include acceptance
-  criteria, an integration owner and a real dependency. Attempt continuation before
-  dependency completion and an overlapping claim; both must fail without mutation.
+- Plan distinct outcomes and declared note targets with criteria, an authorized
+  integration actor and version-pinned dependencies. Acquire leases using current
+  generation, receipt and policy revision. An exact duplicate outcome and overlapping
+  lease must fail without mutation. Output consumers wait for completed output;
+  interface consumers may run against the exact published interface while its
+  producer remains active. Exercise both routes and record input hashes.
+- Freeze acquired session/generation/policy/input context in a private JSON file.
+  Supply it to `draft --coordination-file`; submission must retain that original
+  context. Integration must authenticate its own context and validate the producer
+  separately. Sessions/leases must cover the bounded trial or be legitimately
+  renewed before expiration; expired grants cannot be resurrected by retry.
 - Freeze a common accepted base. Two actual agents edit separate targets, `draft`
   evidence-bearing proposals, then `submit`. The integration owner reviews and
   accepts both. The stale independent change must rebase compatibly and retain its
@@ -72,10 +96,23 @@ output, exit code and time without credential values.
   retain the prior state until the responsible owner's authenticated `resolve`,
   followed by integration acceptance. Inspect `coord facts` and the event record.
   Arbitrary prose review is manual; do not imply automatic truth checking.
-- Handoff work from macOS to Windows, then Windows to Linux. Before `receive`,
-  attempt a proposal as the recipient and confirm rejection. Recipient verifies
-  current receipt, supplies exact revision/hash to `receive`, then continues and
-  completes with evidence. Attempt stale receipt/completion and record rejection.
+- Handoff work from macOS to Windows, then Windows to Linux. Preserve an origin
+  draft with its acquired context before transfer. With accepted revision unchanged,
+  attempt the old session's submission after handoff: it must fail due to fencing,
+  preserve the draft and create no proposal or accepted change. Test the recipient
+  before acquire and with an intentionally stale receipt. The recipient refreshes,
+  acquires the new generation with its own session and exact receipt, then submits
+  and completes a real continuation. Schema 2 uses `acquire`, not legacy `receive`.
+- Make one relevant authenticated policy change and one unrelated role change.
+  Only affected work must be fenced; restricting then restoring authority must not
+  revive an old proposal. A note containing instructions must not change policy.
+- Report a reproducible defect against a versioned output/interface. Check targeted
+  downstream invalidation, retained prior output and responsible owner; replan with
+  corrected pinned inputs, produce a replacement, then resolve with evidence.
+- Stop a consumer after saving a paginated inbox cursor and acknowledgements.
+  Generate targeted events while stopped, reopen it and exhaust all pages. Compare
+  message IDs against expected events, retry acknowledgements idempotently, and
+  verify unrelated actors cannot consume or acknowledge another actor's messages.
 
 ## Offline and external edits: TEAM-07/08
 
@@ -93,6 +130,10 @@ accepted content. Promote it with `promote-draft`, then explicitly `submit` for
 review. Include an accepted deletion with a divergent local edit; retain that edit.
 
 ## Provider-delivery proof: TEAM-10/11
+
+Choose exactly one of the following delivery procedures per recorded route.
+
+### Vendor-synchronized selected folder
 
 On the owner accept a unique fixture marker, a non-ASCII nested filename and a
 known-file deletion. Materialize the accepted snapshot only on the owner. Record
@@ -113,6 +154,41 @@ After provider proof is captured, refresh normal client state and verify exact
 handoff receipts. Repeat each provider/account route claimed for release. A blocked
 Linux vendor route remains a gap; another route does not establish vendor parity.
 
+### Explicit Google Drive revision delivery
+
+Use the [delivery procedure](PRODUCT-V1.md#explicit-revision-delivery-development-scope)
+with an installed reviewed rclone executable, each participant's already authorized
+private configuration, reviewed folder binding and `--provider google-drive`.
+Record account type and adapter/rclone versions without account IDs or locators.
+Do not silently substitute `--fixture-root`, which proves only local transfer.
+
+After attachment, accept new unique marker/Unicode/deletion changes. One designated
+publisher runs `delivery-publish --binding-file PRIVATE_BINDING_JSON`. Each recipient
+runs `delivery-fetch --binding-file PRIVATE_BINDING_JSON` before any coordinator
+refresh could supply those bytes. Capture both transfer and local receipts. Verify
+exact provider-sourced bytes, deletion behavior and preserved divergent drafts;
+remote historical revisions remain retained. Initial attach is coordinator delivery
+and cannot count as this proof.
+
+In disposable namespaces, test unavailable, incomplete and corrupt provider content:
+fetch must refuse without falling back to coordinator bytes or losing local edits.
+Resume the authorized route and retry. Also test an authority revision advancing
+during transfer, lost responses, access revocation and restored access without
+copying credentials between participants. Account/permission operations must stay
+within the trial's separately established authority. Record unavailable scenarios
+as not run, not passed. Repeat with the actual Windows/macOS/Linux participants.
+
+## Graph and selected-folder boundary: GRAPH-01/02/03
+
+Use a disposable selected subfolder with private parent/settings/runtime sentinels.
+Capture graph diagnostics, resolved links and backlinks before and after an
+explicit scoped rename/move. Verify original metadata/body, updated or precisely
+flagged affected links, stale-plan refusal and retained recovery originals. Check
+all sentinel bytes and absence of unexpected writes. A read-only graph result does
+not prove scoped mutation. Native Obsidian can update outer-vault backlinks, so its
+rename behavior alone cannot pass this boundary. Capture native graph/navigation
+UI evidence separately; no production vault or new vault is required.
+
 ## Recovery and final review: TEAM-09/11
 
 Use disposable authority/client state for interruption tests. Run the candidate's
@@ -122,7 +198,7 @@ Recover/retry stable proposal IDs and compare accepted history, event sequence,
 proposal bytes and drafts. Do not corrupt the live project or claim coverage of
 unobserved OS/filesystem failure boundaries.
 
-Store redacted evidence using [the evidence template](team-evidence-template.json). For each TEAM gate list
+Store redacted evidence using [the evidence template](team-evidence-template.json). For each TEAM, COORD and GRAPH gate list
 observed facts, commands/logs and exact pass/fail/partial/not-run status. An
 independent reviewer compares all three participants' reports against the same
 UUID and authority history. No full-release pass until all required scenarios,

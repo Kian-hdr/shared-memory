@@ -35,6 +35,33 @@ def raced_request(database, token, operation, payload, barrier, results, now_ms=
         results.put({'unexpected': type(exc).__name__})
 
 
+def consume_inbox_page(database, token, checkpoint_path, results):
+    """One real consumer process: reopen authority, acknowledge, persist cursor, exit."""
+    try:
+        checkpoint = Path(checkpoint_path)
+        saved = json.loads(checkpoint.read_text()) if checkpoint.exists() else {'cursor': 0, 'message_ids': []}
+        authority = Coordinator(database)
+        page = authority.request(token, 'inbox', {'after_seq': saved['cursor'], 'limit': 2})
+        ids = [message['message_id'] for message in page['messages']]
+        if set(ids) & set(saved['message_ids']):
+            raise AssertionError('Previously consumed logical message returned after persisted cursor')
+        for message_id in ids:
+            result = authority.request(token, 'ack', {'message_id': message_id})
+            if not result['acknowledged']:
+                raise AssertionError('Acknowledgement was not durable')
+            with closing(sqlite3.connect(database)) as connection:
+                before = connection.execute('SELECT * FROM events ORDER BY seq').fetchall()
+            authority.request(token, 'ack', {'message_id': message_id})
+            with closing(sqlite3.connect(database)) as connection:
+                if connection.execute('SELECT * FROM events ORDER BY seq').fetchall() != before:
+                    raise AssertionError('Repeated acknowledgement appended an event')
+        saved = {'cursor': page['next_after_seq'], 'message_ids': saved['message_ids'] + ids}
+        checkpoint.write_text(json.dumps(saved), encoding='utf-8')
+        results.put({'ids': ids, 'has_more': page['has_more']})
+    except Exception as exc:
+        results.put({'unexpected': type(exc).__name__, 'message': str(exc)})
+
+
 def interrupted_accept(database, token, payload, boundary, ready, wait):
     authority = Coordinator(database)
     if boundary == 'before_commit':
@@ -323,6 +350,78 @@ class CoordinationTests(unittest.TestCase):
             with self.assertRaises(ProductError):
                 self.call('plan', self.plan_payload('interrupted'))
         self.assertEqual(self.checkpoint(), before)
+
+    def test_inbox_consumer_restart_paged_catchup_preserves_cursor_ack_and_recipient_isolation(self):
+        # Generate independently identifiable work events through the real API.
+        # Expected IDs come from persisted records, not the inbox paging code or
+        # an assumption about its sequence/ID allocation algorithm.
+        work = ['catchup-' + str(number) for number in range(7)]
+        for identity in work:
+            self.plan(identity)
+            self.acquire(identity)
+
+        def expected_messages():
+            with closing(sqlite3.connect(self.database)) as connection:
+                records = [json.loads(row[0]) for row in connection.execute('SELECT document FROM coord_inbox')]
+            return sorted((record for record in records if record['to_actor'] == 'worker'),
+                          key=lambda record: record['sequence'])
+
+        initial = expected_messages()
+        self.assertEqual([(item['assignment_id'], item['kind']) for item in initial],
+                         [(identity, 'ownership-acquired') for identity in work])
+        cursor_file = self.root / 'private-consumer-cursor.json'
+        context = multiprocessing.get_context('spawn')
+
+        def one_process_page():
+            results = context.Queue()
+            process = context.Process(target=consume_inbox_page,
+                args=(str(self.database), self.tokens['worker-run'], str(cursor_file), results))
+            process.start()
+            try:
+                result = results.get(timeout=15)
+                process.join(timeout=15)
+                self.assertFalse(process.is_alive(), 'Consumer did not shut down')
+                self.assertEqual(process.exitcode, 0)
+                self.assertNotIn('unexpected', result, result)
+                return result
+            finally:
+                if process.is_alive():
+                    process.terminate(); process.join(timeout=5)
+                results.close(); results.join_thread()
+
+        first = one_process_page()
+        self.assertTrue(first['has_more'])
+        self.assertEqual(first['ids'], [item['message_id'] for item in initial[:2]])
+        # The consumer is stopped. New work arrives, and the authority is reopened
+        # before fresh consumer processes resume from the on-disk checkpoint.
+        self.engine = Coordinator(self.database)
+        self.plan('while-stopped'); self.acquire('while-stopped')
+        expected = expected_messages()
+        self.assertEqual(len(expected), 8)
+        for _ in range(10):
+            page = one_process_page()
+            if not page['has_more']:
+                break
+        else:
+            self.fail('Bounded inbox catch-up did not terminate')
+        saved = json.loads(cursor_file.read_text())
+        self.assertEqual(saved['message_ids'], [item['message_id'] for item in expected])
+        self.assertEqual(len(saved['message_ids']), len(set(saved['message_ids'])))
+        self.assertEqual(saved['cursor'], expected[-1]['sequence'])
+        self.assertTrue(all(item['acknowledged'] and item['acknowledged_by'] == 'worker-run'
+                            for item in expected_messages()))
+        self.assertEqual(one_process_page()['ids'], [])
+        self.plan('after-catchup'); self.acquire('after-catchup')
+        newest = expected_messages()[-1]
+        self.assertEqual(newest['assignment_id'], 'after-catchup')
+        self.assertEqual(one_process_page()['ids'], [newest['message_id']])
+        self.assertEqual(one_process_page()['ids'], [])
+        # The owner has its own independently addressed notices, never the
+        # worker's message IDs, and cannot acknowledge any worker message.
+        owner_ids = {item['message_id'] for item in self.call('inbox', {'limit': 1000})['messages']}
+        self.assertFalse(owner_ids & {item['message_id'] for item in expected_messages()})
+        for item in expected_messages():
+            self.reject_unchanged('ack', {'message_id': item['message_id']})
 
     def test_clock_backwards_expiration_renewal_and_revoked_lease_reassignment(self):
         self.plan('work'); item = self.acquire('work')

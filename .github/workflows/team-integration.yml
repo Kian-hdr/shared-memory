@@ -5,6 +5,13 @@ name: Synthetic same-project HTTPS rehearsal
 # https://docs.github.com/en/actions/concepts/billing-and-usage
 on:
   workflow_dispatch:
+    inputs:
+      coordination_schema:
+        description: Coordination schema exercised by all participants
+        type: choice
+        options: ['1', '2']
+        default: '1'
+        required: true
   push:
     branches: [shared-memory-0.2.0-development]
     paths:
@@ -29,6 +36,7 @@ defaults:
 env:
   PYTHONDONTWRITEBYTECODE: '1'
   PYTHONUTF8: '1'
+  SM_COORDINATION_SCHEMA: ${{ inputs.coordination_schema || '1' }}
   # Preserve the same reviewed source bytes in each packaged OS client.
   GIT_CONFIG_COUNT: '1'
   GIT_CONFIG_KEY_0: core.autocrlf
@@ -64,6 +72,7 @@ jobs:
           SM_CI_MASTER: ${{ secrets.SM_CI_MASTER }}
         run: |
           python scripts/rehearse_distributed.py coordinator \
+            --coordination-schema "$SM_COORDINATION_SCHEMA" \
             --package "$RUNNER_TEMP/shared-memory.pyz" \
             --cloudflared "$RUNNER_TEMP/cloudflared" \
             --output "$RUNNER_TEMP/sm-coordinator" --seconds 720 \
@@ -131,6 +140,7 @@ jobs:
           SM_ROLE: ${{ matrix.role }}
         run: |
           python scripts/rehearse_distributed.py client \
+            --coordination-schema "$SM_COORDINATION_SCHEMA" \
             --package "$RUNNER_TEMP/shared-memory.pyz" --role "$SM_ROLE" \
             --output "$RUNNER_TEMP/sm-client" --seconds 720
       - name: Preserve only sanitized client evidence

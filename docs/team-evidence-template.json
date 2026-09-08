@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "status": "not_run",
   "runtime_sha256": null,
   "bundle_id": null,
@@ -22,7 +22,11 @@
       "selected_path_label": null,
       "parent_before_hashes": {},
       "parent_after_hashes": {},
-      "receipt": null
+      "receipt": null,
+      "person_id": null,
+      "agent_id": null,
+      "sessions": [],
+      "inbox_resume_evidence": null
     },
     {
       "os_family": "macOS",
@@ -34,7 +38,11 @@
       "selected_path_label": null,
       "parent_before_hashes": {},
       "parent_after_hashes": {},
-      "receipt": null
+      "receipt": null,
+      "person_id": null,
+      "agent_id": null,
+      "sessions": [],
+      "inbox_resume_evidence": null
     },
     {
       "os_family": "Linux",
@@ -46,7 +54,11 @@
       "selected_path_label": null,
       "parent_before_hashes": {},
       "parent_after_hashes": {},
-      "receipt": null
+      "receipt": null,
+      "person_id": null,
+      "agent_id": null,
+      "sessions": [],
+      "inbox_resume_evidence": null
     }
   ],
   "provider_routes": [],
@@ -127,6 +139,76 @@
       "expected": null,
       "observed": null,
       "limitations": []
+    },
+    "COORD-01": {
+      "status": "not_run",
+      "evidence": [],
+      "expected": null,
+      "observed": null,
+      "limitations": []
+    },
+    "COORD-02": {
+      "status": "not_run",
+      "evidence": [],
+      "expected": null,
+      "observed": null,
+      "limitations": []
+    },
+    "COORD-03": {
+      "status": "not_run",
+      "evidence": [],
+      "expected": null,
+      "observed": null,
+      "limitations": []
+    },
+    "COORD-04": {
+      "status": "not_run",
+      "evidence": [],
+      "expected": null,
+      "observed": null,
+      "limitations": []
+    },
+    "COORD-05": {
+      "status": "not_run",
+      "evidence": [],
+      "expected": null,
+      "observed": null,
+      "limitations": []
+    },
+    "COORD-06": {
+      "status": "not_run",
+      "evidence": [],
+      "expected": null,
+      "observed": null,
+      "limitations": []
+    },
+    "COORD-07": {
+      "status": "not_run",
+      "evidence": [],
+      "expected": null,
+      "observed": null,
+      "limitations": []
+    },
+    "GRAPH-01": {
+      "status": "not_run",
+      "evidence": [],
+      "expected": null,
+      "observed": null,
+      "limitations": []
+    },
+    "GRAPH-02": {
+      "status": "not_run",
+      "evidence": [],
+      "expected": null,
+      "observed": null,
+      "limitations": []
+    },
+    "GRAPH-03": {
+      "status": "not_run",
+      "evidence": [],
+      "expected": null,
+      "observed": null,
+      "limitations": []
     }
   },
   "independent_review": {
@@ -134,5 +216,6 @@
     "decision": "not_run",
     "unresolved": []
   },
-  "contains_credentials": false
+  "contains_credentials": false,
+  "coordination_schema": 2
 }

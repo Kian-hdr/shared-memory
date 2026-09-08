@@ -29,15 +29,48 @@ Both local Python 3.13 and 3.12 runs collected **280 tests: 278 passed and
 two real Windows-only junction fixtures were explicitly skipped**. The native-renamed
 synthetic graph still resolves five notes/twelve edges without diagnostics.
 Independent review approved the flush, replacement/mutation and junction boundaries.
-Actual Windows acceptance requires the corrected-source matrix to pass.
+The corrected e1d023c [matrix](https://github.com/Kian-hdr/shared-memory/actions/runs/34239839865)
+passed all twelve jobs, including both actual Windows junction fixtures. Product
+jobs each collected 280 tests: macOS/Windows passed 278 with two platform skips;
+Ubuntu passed 277 with three. Every product job also passed the 57-call packaged
+coordination rehearsal with four expected refusals.
 
-The same-source [HTTPS regression](https://github.com/Kian-hdr/shared-memory/actions/runs/34238278569)
+The preceding 3c8e9e9 [HTTPS regression](https://github.com/Kian-hdr/shared-memory/actions/runs/34238278569)
 passed all four jobs and **123 packaged CLI calls**. All three OS clients reached
 revision 3 with identical content and preserved private parent/settings/attachment
 bytes. Task-owned processes stopped. The package SHA-256 was
 `0ca9413784f0f77a87c757d4730be629ce90eb6c279015f145553823b3d832de`, identical to
 the independently built/read-back local package. This tests schema-1 compatibility,
 not the new distributed session workflow, provider receipt or independent people.
+
+## Distributed schema-2 rehearsal and inbox resume, 2026-09-08
+
+The distributed script now offers explicit `--coordination-schema 2`, retaining
+schema 1 by default. The workflow dispatch input selects one schema for every
+participant; signed rendezvous metadata binds that selection before downloaded
+package execution. Each actor creates its own authenticated session. Same-base
+proposals integrate at revisions 1–3; actual Windows-role and Linux-role handoff
+continuations produce revisions 4–5. An origin's preserved draft is refused after
+transfer while its base is still current, before the recipient acquires. The
+recipient also proves stale-receipt refusal, targeted inbox acknowledgement and
+fresh fenced acquisition. Exact private parent/settings/attachment bytes survive.
+
+One-machine loopback selfchecks against the exact reviewed e1d023c executable
+passed: schema 1 made 96 packaged calls/two expected refusals at revision 3;
+schema 2 made 309 calls/four refusals at revision 5 with content hash
+`34bbe57a2286cd4d98343d8fadf73cc74ac7e783f1ef3ece48535722cd0da764`.
+Call counts include polling, not distinct coverage. All four processes stopped.
+Independent review inspected the frozen script and both complete reports. Actual
+remote OS execution of this extension is a separate pending check. Neither local
+role names nor automated runners constitute independent people/provider TEAM-11.
+
+The new inbox-resume acceptance test starts separate consumer processes against
+the actual SQLite authority, persists a two-message-page cursor, resumes after new
+addressed events arrive and checks all expected message IDs without omission or
+duplicate processing. Acknowledgements survive reopening and are idempotent; another
+actor cannot see or acknowledge those IDs. The focused coordination suite passed
+44/44 on Python 3.13 and 3.12. This demonstrates the durable API, not an installed
+always-on consumer or notification service.
 
 ## Coordination, graph and upgrade extension, 2026-09-08
 
