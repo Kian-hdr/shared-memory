@@ -168,6 +168,108 @@ class MaintenanceTests(unittest.TestCase):
         self.assertEqual(set(result['files']), {'Home.md', 'Notes/Other.md'})
         self.assertEqual(result['external_or_unresolved_wikilinks'], [{'path': 'Home.md', 'target': 'Missing/Other.md'}])
 
+    def test_migration_graph_checks_markdown_aliases_anchors_and_ambiguity(self):
+        source = self.root / 'Source'; source.mkdir()
+        (source / 'A').mkdir(); (source / 'B').mkdir()
+        (source / 'A' / 'Same.md').write_bytes(b'# Same\n')
+        (source / 'B' / 'Same.md').write_bytes(b'# Same\n')
+        (source / 'Canonical.md').write_bytes(b'---\naliases: [Shortcut]\n---\n# Present\n')
+        (source / 'Home.md').write_bytes(
+            b'[broken](Missing.md)\n[[Shortcut]]\n[[Same]]\n'
+            b'[anchor](Canonical.md#absent)\n[[Canonical#Present]]\n'
+            b'`[[CodeOnly]]`\n```md\n[ignored](Code.md)\n```\n')
+        before = inventory(self.root)
+        result = maintenance.migration_plan(source, self.root / 'Future')
+        graph = result['link_analysis']
+        by_line = {edge['line']: edge for edge in graph['edges']}
+        self.assertEqual(by_line[1]['status'], 'missing')
+        self.assertEqual(by_line[1]['requested_path'], 'Missing.md')
+        self.assertEqual(by_line[2]['target'], 'Canonical.md')
+        self.assertEqual(by_line[2]['resolution'], 'alias')
+        self.assertEqual(by_line[3]['status'], 'ambiguous')
+        self.assertEqual(by_line[3]['candidates'], ['A/Same.md', 'B/Same.md'])
+        self.assertEqual(by_line[4]['anchor_status'], 'missing')
+        self.assertEqual(by_line[5]['anchor_status'], 'resolved')
+        self.assertEqual(len(by_line), 5)
+        self.assertIn('alias_requires_canonical_link', {d['code'] for d in graph['diagnostics']})
+        self.assertEqual(result['external_or_unresolved_wikilinks'], [{'path': 'Home.md', 'target': 'Same'}])
+        self.assertEqual(inventory(self.root), before)
+        self.assertFalse(result['apply_performed'])
+
+    def test_migration_graph_reports_omitted_notes_without_exporting_private_links(self):
+        source = self.root / 'Source'; source.mkdir()
+        (source / 'Bad.md').write_bytes(b'\xff\xfe')
+        (source / 'Home.md').write_bytes(
+            b'[[https://user:private-fixture@example.invalid/key?q=secret]]\n'
+            b'[[../Private.md]]\n[[credentials/Hidden]]\n[[Bad]]\n')
+        (self.root / 'Private.md').write_bytes(b'PRIVATE-PARENT')
+        (source / 'credentials').mkdir()
+        (source / 'credentials' / 'Hidden.md').write_bytes(b'[[PRIVATE-GRAPH-MARKER]]')
+        (source / 'secrets.md').write_bytes(b'PRIVATE-CREDENTIAL-NOTE')
+        before = inventory(self.root)
+        original_scan, original_sha = os.scandir, maintenance.sha
+        def guarded_scan(path):
+            self.assertNotEqual(Path(path), source / 'credentials', 'Private subtree was traversed')
+            return original_scan(path)
+        def guarded_sha(path):
+            self.assertNotEqual(Path(path), source / 'secrets.md', 'Private note was read')
+            return original_sha(path)
+        with patch.object(os, 'scandir', side_effect=guarded_scan), patch.object(maintenance, 'sha', side_effect=guarded_sha):
+            result = maintenance.migration_plan(source, self.root / 'Future')
+        self.assertNotIn('credentials/Hidden.md', result['files'])
+        self.assertNotIn('secrets.md', result['files'])
+        graph = result['link_analysis']
+        self.assertIn('non_utf8_note_omitted', {d['code'] for d in graph['diagnostics']})
+        self.assertEqual([e['status'] for e in graph['edges']], ['external', 'outside_scope', 'excluded', 'excluded'])
+        serialized = json.dumps(graph)
+        for marker in ('private-fixture', 'example.invalid', 'PRIVATE-GRAPH-MARKER'):
+            self.assertNotIn(marker, serialized)
+        self.assertTrue(all(e['requested_path'] is None for e in graph['edges'][:3]))
+        self.assertEqual(inventory(self.root), before)
+
+    def test_migration_graph_limits_fail_without_creating_destination(self):
+        from shared_workspace import knowledge
+        source = self.root / 'Source'; source.mkdir()
+        (source / 'Large.md').write_bytes(b'a' * (knowledge.MAX_NOTE_BYTES + 1))
+        before = inventory(self.root)
+        with self.assertRaises(ProductError) as raised:
+            maintenance.migration_plan(source, self.root / 'Future')
+        self.assertEqual(raised.exception.code, 'knowledge_limit')
+        self.assertEqual(inventory(self.root), before)
+
+    def test_migration_refuses_inventory_graph_disagreement(self):
+        from shared_workspace import knowledge
+        source = self.root / 'Source'; source.mkdir()
+        note = source / 'Home.md'; note.write_bytes(b'# Before\n')
+        original = knowledge.analyze
+        def changed(**kwargs):
+            note.write_bytes(b'# After\n')
+            return original(**kwargs)
+        with patch.object(knowledge, 'analyze', side_effect=changed):
+            with self.assertRaises(ProductError) as raised:
+                maintenance.migration_plan(source, self.root / 'Future')
+        self.assertEqual(raised.exception.code, 'migration_source_changed')
+        self.assertEqual(note.read_bytes(), b'# After\n')
+        self.assertFalse((self.root / 'Future').exists())
+
+    def test_migration_refuses_files_arriving_between_inventory_and_graph(self):
+        from shared_workspace import knowledge
+        for filename in ('new.png', 'unlinked.bin'):
+            with self.subTest(filename=filename), tempfile.TemporaryDirectory(dir=self.root) as directory:
+                source = Path(directory) / 'Source'; source.mkdir()
+                (source / 'Home.md').write_bytes(b'![image](new.png)\n')
+                original = knowledge.analyze
+                def changed(**kwargs):
+                    (source / filename).write_bytes(b'new attachment')
+                    return original(**kwargs)
+                destination = Path(directory) / 'Future'
+                with patch.object(knowledge, 'analyze', side_effect=changed):
+                    with self.assertRaises(ProductError) as raised:
+                        maintenance.migration_plan(source, destination)
+                self.assertEqual(raised.exception.code, 'migration_source_changed')
+                self.assertEqual((source / filename).read_bytes(), b'new attachment')
+                self.assertFalse(destination.exists())
+
     def test_private_setup_records_cannot_enter_accepted_project_content(self):
         from shared_workspace.engine import validate_files
         for name in ('setup-intent.json', 'Nested/setup-intent.json',

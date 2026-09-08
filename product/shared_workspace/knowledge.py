@@ -629,7 +629,7 @@ class _Graph:
 
     def resolve(self, source, raw, syntax):
         result = {'target': None, 'status': 'missing', 'resolution': None, 'anchor': None,
-                  'anchor_status': 'not_requested', 'candidates': []}
+                  'anchor_status': 'not_requested', 'candidates': [], 'requested_path': None}
         if raw is None:
             result['status'] = 'unsupported_reference'
             return result
@@ -690,6 +690,10 @@ class _Graph:
             except ProductError:
                 result['status'] = 'unsupported_reference'
                 return result
+            # Expose only validated selected-scope paths, never raw URLs, private
+            # references or absolute paths. Consumers can identify missing links
+            # without reparsing source text with a second, weaker parser.
+            result['requested_path'] = name
             suffix = PurePosixPath(name).suffix.casefold()
             choices = [name] if suffix in NOTE_EXTENSIONS | ATTACHMENTS else [name, name + '.md', name + '.markdown']
             if any('/'.join(choice.split('/')[:count]) in self.excluded

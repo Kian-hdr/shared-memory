@@ -501,7 +501,17 @@ Local rclone fixtures and synthetic cross-OS tests do not establish those result
 ## Migration and release gates
 
 `migration-plan SOURCE --destination FRESH_TARGET` is read-only. It inventories
-hashes, excluded private state and unresolved/ambiguous links. It does not move files,
+hashes and excluded private state. In development after alpha.1, `link_analysis`
+uses the same bounded graph analyser as `graph`: Markdown/reference links,
+wikilinks, aliases, anchors, ambiguity, excluded references and parser limits are
+reported together. The original `external_or_unresolved_wikilinks` field remains
+a narrow compatibility projection; use `link_analysis` for the full link audit.
+Alias resolution includes the existing canonical-link portability warning and is
+not proof of native Obsidian rendering. Private/external link destinations are
+redacted, unsupported syntax is explicit, and graph limits fail rather than
+returning a falsely complete plan. Changed source files or directory inventories
+detected during the audit refuse the plan; this is not a filesystem lock against
+concurrent editors. It does not move files,
 change sharing or authorize migration. For live data, follow its owner's backup,
 working-copy and explicit target-approval requirements as a separate operation.
 An alpha setup trial is not authorization to restructure a live vault or backup drive.

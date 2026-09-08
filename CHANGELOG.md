@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Migration dry runs use the bounded graph analyser for Markdown, wikilinks,
+  aliases and anchors, preserving explicit ambiguity and parser-limit diagnostics.
+- Plans refuse observed file/directory changes, and exclude credential/runtime
+  subtrees before traversal. They remain read-only and do not authorize migration.
+- Graph edges expose only validated local requested paths for actionable missing
+  references; external, private and outside-scope destinations remain redacted.
+
 ## 0.2.0-alpha.1
 
 First public experimental release of the independent Shared Memory product.

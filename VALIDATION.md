@@ -1,5 +1,30 @@
 # Validation record
 
+## Unreleased migration-preparation correction, 2026-09-08
+
+The published alpha.1 assets remain immutable at c1eb231. Running that baseline
+against an isolated fixture reproduced a false unresolved alias and missing
+Markdown/anchor diagnostics. The development correction uses the same bounded
+graph analyser as the product graph command, with an additive `link_analysis`
+result and the original narrow wikilink projection retained for compatibility.
+It reports valid alias resolution with the existing Obsidian portability warning.
+
+An independent reviewer reproduced a second issue in the initial correction:
+an attachment arriving during analysis could resolve in the graph but be absent
+from the migration inventory. Both referenced and unreferenced actual file-arrival
+cases now refuse the plan, preserve the arriving bytes and create no destination.
+File identity and graph-content comparisons reject observed changes. These checks
+are not a filesystem lock against hostile concurrent replacement.
+
+Five added regression cases cover Markdown/aliases/anchors/ambiguity, private and
+external reference redaction plus invalid UTF-8, explicit graph-limit failure,
+changed note bytes and arriving attachments. The private-reference case also
+requires credential directories and notes to be pruned before traversal/reading.
+Local package execution verified the new diagnostics inside a selected-subfolder
+fixture while preserving all existing bytes. No live vault or backup drive was used.
+Cross-platform results for this unreleased correction must be read from its own
+CI run; the alpha's passing CI does not validate these later changes.
+
 ## Current release scope, 2026-09-08
 
 The public `v0.2.0-alpha.1` candidate is an experimental release. Publication no

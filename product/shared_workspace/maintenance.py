@@ -172,8 +172,17 @@ def migration_plan(source, destination):
     destination = absolute_path(raw_destination).resolve()
     if unsafe_ancestor(destination) is not None or destination.exists() or destination.is_relative_to(source):
         raise ProductError(3, "migration_target_invalid", "Plan a fresh destination outside the selected source tree.")
-    files, warnings, links, names = {}, [], [], {}
+    files, warnings, observed, directories = {}, [], {}, {}
+
+    def identity(path):
+        info = path.stat()
+        return info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns
+
+    def changed():
+        raise ProductError(3, "migration_source_changed", "Selected files changed during migration planning; retry after edits stop.")
     from .engine import PROTECTED
+    from .knowledge import PRIVATE, PRIVATE_FILES, analyze
+    private_names = PROTECTED | PRIVATE | PRIVATE_FILES | {"connection.json", "member.token"}
     # Prune private directories and links before enumerating any descendants.
     # A rglob inventory can cross a Windows junction even when later file reads
     # are filtered. Recheck discovered ancestors before content access as well.
@@ -184,6 +193,7 @@ def migration_plan(source, destination):
         if unsafe_ancestor(folder) is not None:
             warnings.append({"path": folder.relative_to(source).as_posix(), "issue": "symlink_requires_manual_review"})
             continue
+        directories[folder] = identity(folder)
         with os.scandir(folder) as entries:
             children = sorted((Path(entry.path) for entry in entries), reverse=True)
         for path in children:
@@ -192,7 +202,7 @@ def migration_plan(source, destination):
                 warnings.append({"path": relative, "issue": "symlink_requires_manual_review"})
             elif path.name.startswith('.'):
                 warnings.append({"path": relative, "issue": "private_or_hidden_file_excluded"})
-            elif path.name.casefold() in PROTECTED | {"connection.json", "member.token"}:
+            elif path.name.casefold() in private_names:
                 warnings.append({"path": relative, "issue": "private_state_or_credential_excluded"})
             elif path.is_dir():
                 pending.append(path)
@@ -209,34 +219,38 @@ def migration_plan(source, destination):
         if any(part.startswith(".") for part in path.relative_to(source).parts):
             warnings.append({"path": relative, "issue": "private_or_hidden_file_excluded"})
             continue
-        if (any(part.casefold() in PROTECTED | {"connection.json", "member.token"} for part in path.relative_to(source).parts)
+        if (any(part.casefold() in private_names for part in path.relative_to(source).parts)
                 or path.suffix.casefold() in {".sqlite", ".sqlite3", ".db", ".key", ".pem", ".token"}
                 or path.name.casefold().endswith((".sqlite-wal", ".sqlite-shm", ".sqlite-journal", ".sqlite3-wal", ".sqlite3-shm", ".sqlite3-journal", ".db-wal", ".db-shm", ".db-journal"))):
             warnings.append({"path": relative, "issue": "private_state_or_credential_excluded"})
             continue
-        files[relative] = {"sha256": sha(path), "bytes": path.stat().st_size}
-        if path.suffix.casefold() == ".md" and path.stat().st_size <= 10 * 1024 * 1024:
-            if unsafe_ancestor(path) is not None:
-                files.pop(relative)
-                warnings.append({"path": relative, "issue": "symlink_requires_manual_review"})
-                continue
-            names.setdefault(path.stem, []).append(relative)
-            for target in re.findall(r"\[\[([^\]]+)\]\]", path.read_text(encoding="utf-8")):
-                links.append((relative, target.replace("\\|", "|").split("|")[0].split("#")[0]))
-    missing = []
-    for path, target in links:
-        if not target:
-            continue
-        if "/" in target:
-            candidate = target if target.endswith(".md") else target + ".md"
-            resolved = candidate in files or (Path(path).parent / candidate).as_posix() in files
-        else:
-            resolved = len(names.get(Path(target).stem, [])) == 1
-        if not resolved:
-            missing.append({"path": path, "target": target})
+        observed[relative] = identity(path)
+        files[relative] = {"sha256": sha(path), "bytes": observed[relative][2]}
+        if identity(path) != observed[relative]:
+            changed()
+    graph = analyze(root=source)
+    # A plan must not combine an old inventory with differently parsed note
+    # contents. Graph traversal retains its own no-follow reads and hard bounds.
+    for folder, expected in directories.items():
+        if unsafe_ancestor(folder) is not None or not folder.is_dir() or identity(folder) != expected:
+            changed()
+    for relative, expected in observed.items():
+        path = source / relative
+        if unsafe_ancestor(path) is not None or not path.is_file():
+            changed()
+        if identity(path) != expected:
+            changed()
+    for node in graph['nodes']:
+        digest = node['content_sha256']
+        if node['path'] not in files or (digest is not None and files[node['path']]['sha256'] != digest):
+            changed()
+    # Retain the original narrow field for consumers; the complete graph is the
+    # authoritative link audit, including Markdown, anchors and alias warnings.
+    missing = [{'path': edge['source'], 'target': edge['requested_path'] or '[inspect source link]'}
+               for edge in graph['edges'] if edge['syntax'] == 'wikilink' and edge['status'] != 'resolved']
     warnings.sort(key=lambda item: (item['path'], item['issue']))
     plan = {"schema_version": 1, "source": str(source), "destination": str(destination), "files": files,
-            "warnings": warnings, "external_or_unresolved_wikilinks": missing,
+            "warnings": warnings, "external_or_unresolved_wikilinks": missing, "link_analysis": graph,
             "actions": ["Verify independent backup and intended working copy", "Review excluded/private files and links",
                         "Copy selected files without changing source", "Verify all hashes, links and parent-vault preservation",
                         "Initialize/join reviewed runtime only after acceptance", "Keep source and backup for rollback"],
