@@ -54,7 +54,7 @@ Local tests and a packaged TLS rehearsal do not establish cloud-provider deliver
 real recipient onboarding or mixed-OS TEAM-11. Stable V1 is not complete. The
 [readiness roadmap](docs/READINESS.md) retains those gates and the deferred GitHub
 launch rename. The historical advisory toolkit and 0.1.0 preview remain documented
-separately; current public main may lag this local development candidate.
+separately; the [published development branch](https://github.com/Kian-hdr/shared-obsidian-workspace/tree/shared-memory-0.2.0-development) contains the candidate source, while public main remains the historical toolkit.
 
 ## Let your agent set it up
 

@@ -1,6 +1,30 @@
 # Validation record
 
-## Authoritative development build 0.2.0, 2026-09-08
+## Published development branch and cross-platform CI, 2026-09-08
+
+The reviewed source is published on
+[`shared-memory-0.2.0-development`](https://github.com/Kian-hdr/shared-obsidian-workspace/tree/shared-memory-0.2.0-development).
+This is a development branch, not a stable V1 release or a repository rename.
+
+The [first run](https://github.com/Kian-hdr/shared-obsidian-workspace/actions/runs/34178714443)
+passed ten of twelve jobs. Both Windows product jobs exposed a fixture newline
+mismatch: Windows text-mode writes produced CRLF while the test expected LF.
+The runtime correctly preserved the actual bytes. Commit
+[`9214375`](https://github.com/Kian-hdr/shared-obsidian-workspace/commit/9214375ea778c4c650def5ecb5f253756d218f49)
+uses explicit UTF8 fixture bytes and adds a mixed-line-ending roundtrip, bringing
+the product suite to 106 tests. The
+[corrected run](https://github.com/Kian-hdr/shared-obsidian-workspace/actions/runs/34178908410)
+passed **all 12 jobs** on that exact commit. The six product jobs use Python
+3.11/3.13 across Windows, macOS and Ubuntu. macOS executes all 106 tests; Windows
+skips the POSIX-only injected-hook fixture and unavailable unsupported-Python
+fixture; Ubuntu skips only the unavailable unsupported-Python fixture. Skips are
+not counted as passed cases. All six legacy toolkit/demo jobs also passed.
+
+Actual provider transport, independent recipient operators and same-project
+mixed-OS TEAM-11 remain distinct requirements. Automated hosted OS actors are
+labeled explicitly and do not count as independent human onboarding.
+
+## Local pre-upload checkpoint 0.2.0, 2026-09-08
 
 **105/105 product tests passed on macOS/Python 3.13.15 and 3.12.13**, no skips:
 29 engine, 7 assignment-limit, 7 acceptance-boundary, 14 client, 3 offline-reconciliation,

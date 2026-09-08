@@ -1,0 +1,143 @@
+name: Synthetic same-project HTTPS rehearsal
+
+# Reviewed development branch or manual execution. This is automated runner evidence, not a
+# human/provider TEAM-11 pass. Standard runners in public repositories are free:
+# https://docs.github.com/en/actions/concepts/billing-and-usage
+on:
+  workflow_dispatch:
+  push:
+    branches: [shared-memory-0.2.0-development]
+    paths:
+      - .github/workflows/team-integration.yml
+      - scripts/rehearse_distributed.py
+      - product/**
+      - requirements-server.txt
+      - scripts/build_product.py
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: synthetic-team-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  PYTHONDONTWRITEBYTECODE: '1'
+  PYTHONUTF8: '1'
+  # Preserve the same reviewed source bytes in each packaged OS client.
+  GIT_CONFIG_COUNT: '1'
+  GIT_CONFIG_KEY_0: core.autocrlf
+  GIT_CONFIG_VALUE_0: 'false'
+
+jobs:
+  coordinator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+      - run: python -m pip install -r requirements-server.txt
+      - name: Build reviewed source into private runner tools
+        run: python scripts/build_product.py --output "$RUNNER_TEMP/shared-memory.pyz"
+      - name: Download pinned official testing-only tunnel
+        # Observed 2026-09-08 from the official release asset digest:
+        # https://github.com/cloudflare/cloudflared/releases/tag/2026.8.3
+        # No account, DNS setup or unattended installation is performed.
+        # https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/trycloudflare/
+        run: |
+          curl --fail --location --retry 2 --max-time 90 \
+            https://github.com/cloudflare/cloudflared/releases/download/2026.8.3/cloudflared-linux-amd64 \
+            --output "$RUNNER_TEMP/cloudflared"
+          printf '%s  %s\n' f29324fe934d1e100617484c78deef803c4dc2cd351d645bbde42e96b4fccc5e "$RUNNER_TEMP/cloudflared" | sha256sum --check --strict
+          chmod 700 "$RUNNER_TEMP/cloudflared"
+      - name: Start bounded coordinator and await signed public rendezvous
+        env:
+          SM_CI_MASTER: ${{ secrets.SM_CI_MASTER }}
+        run: |
+          python scripts/rehearse_distributed.py coordinator \
+            --package "$RUNNER_TEMP/shared-memory.pyz" \
+            --cloudflared "$RUNNER_TEMP/cloudflared" \
+            --output "$RUNNER_TEMP/sm-coordinator" --seconds 720 \
+            > "$RUNNER_TEMP/sm-coordinator.private.log" 2>&1 &
+          echo "$!" > "$RUNNER_TEMP/sm-coordinator.pid"
+          python scripts/rehearse_distributed.py wait \
+            --file "$RUNNER_TEMP/sm-coordinator/rendezvous.json" --seconds 120
+      - name: Publish exact reviewed package and signed public rendezvous
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sm-rendezvous-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/sm-coordinator/rendezvous.json
+            ${{ runner.temp }}/sm-coordinator/shared-memory.pyz
+          if-no-files-found: error
+          retention-days: 1
+      - name: Await the same-project protocol result
+        run: |
+          python scripts/rehearse_distributed.py wait \
+            --file "$RUNNER_TEMP/sm-coordinator/report.json" --seconds 720 --require-passed
+      - name: Stop task-owned server and tunnel on all outcomes
+        if: always()
+        run: |
+          if test -f "$RUNNER_TEMP/sm-coordinator.pid"; then
+            kill -TERM "$(cat "$RUNNER_TEMP/sm-coordinator.pid")" 2>/dev/null || true
+          fi
+          if test -d "$RUNNER_TEMP/sm-coordinator"; then
+            python scripts/rehearse_distributed.py wait \
+              --file "$RUNNER_TEMP/sm-coordinator/report.json" --seconds 30
+          fi
+      - name: Preserve only sanitized coordinator evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sm-coordinator-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/sm-coordinator/report.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  clients:
+    # No needs:coordinator: clients must overlap the living coordinator job.
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            role: macos
+          - os: windows-latest
+            role: windows
+          - os: ubuntu-latest
+            role: linux
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+      - name: Verify downloaded package before joining concurrent rehearsal
+        env:
+          SM_CI_MASTER: ${{ secrets.SM_CI_MASTER }}
+          GITHUB_TOKEN: ${{ github.token }}
+          SM_ROLE: ${{ matrix.role }}
+        run: |
+          python scripts/rehearse_distributed.py client \
+            --package "$RUNNER_TEMP/shared-memory.pyz" --role "$SM_ROLE" \
+            --output "$RUNNER_TEMP/sm-client" --seconds 720
+      - name: Preserve only sanitized client evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sm-${{ matrix.role }}-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/sm-client/report.json
+          if-no-files-found: warn
+          retention-days: 7

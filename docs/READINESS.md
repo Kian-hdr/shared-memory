@@ -142,7 +142,7 @@ primary source. Split rows when account types or policies change capabilities.
 
 | Provider and account type | Windows | macOS | Linux | Product verification / next evidence |
 | --- | --- | --- | --- | --- |
-| Local filesystem; no account | Required | Required | Required | Current 1.3.0 macOS tests are local evidence; run the candidate CI matrix and OS-specific installation checks; no cross-device delivery is implied |
+| Local filesystem; no account | Required | Required | Required | The corrected development CI passes on all three OSes; installed/operator behavior and real cross-device delivery remain separate evidence |
 | Self-hosted storage; deployment-specific identity | Required integration path | Required integration path | Required integration path | Authenticated coordinator HTTPS and local folder receipt inspection are implemented and tested locally; an actual storage delivery route and reachable deployment still need selection and real receipt/recovery validation |
 | Google Drive; personal Google account | Vendor desktop route documented; adapter unverified | Vendor desktop route documented; adapter unverified | Drive for desktop unavailable; alternative integration unimplemented/unverified | Check account-specific API/access capabilities and supported route before claiming product support |
 | Google Drive; Workspace / shared drives where applicable | Vendor desktop route documented; account-policy integration unverified | Vendor desktop route documented; account-policy integration unverified | Drive for desktop unavailable; alternative integration unimplemented/unverified | Verify actual Workspace policy, shared-folder/drive access and recipient receipt; no personal-account equivalence assumed |
@@ -185,8 +185,10 @@ The 1.3.0 scripted local demo is a useful regression fixture, not this team suit
 
 **Status, 2026-09-08:** the 0.2.0 development engine/client and packaged CLI now
 have executable local acceptance coverage. The full product suite passed 105 tests
-on macOS/Python 3.13 and 3.12. Actual Uvicorn TLS serving passed a 16-command local
-rehearsal. These establish bounded local contract behavior, not complete TEAM
+on macOS/Python 3.13 and 3.12 before publication. The subsequent 106-case
+product suite and toolkit demos passed the twelve-job Windows/macOS/Ubuntu CI
+matrix at commit 9214375, with explicit platform-specific skips in the validation
+record. Actual Uvicorn TLS serving passed a 16-command local rehearsal. These establish bounded local contract behavior, not complete TEAM
 acceptance: independent live recipients, provider delivery and mixed-OS TEAM-11
 remain unverified. See [validation](../VALIDATION.md).
 
@@ -288,8 +290,7 @@ revisions measured 34 ms p95 acceptance, 175 ms local receipt and 1.14 s unchang
 refresh; first materialization took 0.98 s. These one-Mac measurements are engineering
 evidence for this profile, not a production capacity, latency SLA or cloud result.
 
-Remaining release evidence: candidate execution on Windows/Linux, clean independent
-recipient setup, a reachable reviewed coordinator deployment, real provider/account
+Remaining release evidence: clean independent recipient setup, a reachable reviewed coordinator deployment, real provider/account
 delivery and offline recovery, and all three OS clients on the same project under
 TEAM-11. Public upload/rename/deployment and real provider permission changes keep
 their existing gates. Live Vault migration remains gated on validated readiness and
