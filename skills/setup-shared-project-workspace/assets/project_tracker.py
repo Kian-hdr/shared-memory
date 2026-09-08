@@ -16,9 +16,10 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path, PureWindowsPath
 from typing import Any
 
-WORKSPACE_TRACKER_VERSION = "1.2.0"
+WORKSPACE_TRACKER_VERSION = "1.3.0"
 SCHEMA_VERSION = 1
 GENERATOR_SIGNATURE = "generated-by: setup-shared-project-workspace"
+PORTABLE_ITEMS_FILTER = 'this.file.ext == "base" && file.inFolder(this.file.folder + "/Items")'
 
 STATUSES = {
     "not_started",
@@ -309,6 +310,38 @@ def resolve_target(target: str) -> Path:
     return PROJECT_ROOT / normalize_target(target)
 
 
+def sha256_directory(path: Path) -> str:
+    """Fingerprint descendants without following links or hashing tracker records."""
+    digest = hashlib.sha256()
+    items = ITEMS_DIR.resolve()
+
+    def visit(directory: Path) -> None:
+        for child in sorted(directory.iterdir(), key=lambda entry: entry.name):
+            if child == items:
+                continue
+            relative = child.relative_to(path).as_posix()
+            if child.is_symlink():
+                # Following links could leave the project or create a cycle. Require
+                # explicit file claims when linked content needs drift protection.
+                raise TrackerError(f"Directory target contains a symbolic link: {relative}. Use exact file targets instead.")
+            if child.is_dir():
+                entry = [relative, "directory"]
+            elif child.is_file():
+                file_digest = hashlib.sha256()
+                with child.open("rb") as handle:
+                    for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                        file_digest.update(chunk)
+                entry = [relative, file_digest.hexdigest()]
+            else:
+                raise TrackerError(f"Directory target contains an unsupported file: {relative}. Use exact file targets instead.")
+            digest.update((json.dumps(entry, ensure_ascii=True) + "\n").encode("utf-8"))
+            if child.is_dir():
+                visit(child)
+
+    visit(path)
+    return "directory-sha256:" + digest.hexdigest()
+
+
 def sha256_target(target: str) -> str:
     if is_resource_label(normalize_target(target)):
         return "missing"
@@ -316,11 +349,9 @@ def sha256_target(target: str) -> str:
     if not path.exists():
         return "missing"
     if path.is_dir():
-        return "directory"
+        return sha256_directory(path)
     if not path.is_file():
         return "unsupported"
-    if path.stat().st_size > 20 * 1024 * 1024:
-        return "too-large"
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
@@ -531,6 +562,7 @@ def command_claim(args: argparse.Namespace) -> None:
     if missing:
         raise TrackerError("Unknown dependencies: " + ", ".join(missing))
     baseline = {item: int(index[item][1].get("revision", 0)) for item in dependencies}
+    target_hashes = hash_targets(targets)
     actor_id = slug(args.actor)
     ensure_actor(actor_id, args.owner, args.agent)
     now = utc_now()
@@ -572,7 +604,7 @@ def command_claim(args: argparse.Namespace) -> None:
         "handoff_pending": False,
         "handoff_id": "",
         "next_action": args.next_action,
-        "target_hashes": pack_hashes(hash_targets(targets)),
+        "target_hashes": pack_hashes(target_hashes),
     }
     path = ITEMS_DIR / f"WORK-{work_id}.md"
     write_record(path, data, build_work_body(data))
@@ -661,6 +693,17 @@ def command_change(args: argparse.Namespace) -> None:
     before_changed = {target: before_map.get(target, "unrecorded") for target in changed_targets}
     after_changed = hash_targets(changed_targets)
     after_all = hash_targets(all_targets)
+    undeclared = [
+        target for target in data.get("targets", [])
+        if before_map.get(target) != after_all[target]
+        and not any(target == changed or target.startswith(changed + "/") or changed == "."
+                    for changed in changed_targets)
+    ]
+    if undeclared:
+        raise TrackerError(
+            "Unrecorded changes outside the declared targets: " + ", ".join(undeclared)
+            + ". Review these changes and explicitly include each affected claimed target before recording."
+        )
     old_status = data["status"]
     data["targets"] = all_targets
     data["status"] = new_status
@@ -741,6 +784,12 @@ def command_complete(args: argparse.Namespace) -> None:
     before_status = data["status"]
     before_hashes = unpack_hashes(data.get("target_hashes", []))
     after_hashes = hash_targets(data.get("targets", []))
+    drift = [target for target, digest in after_hashes.items() if before_hashes.get(target) != digest]
+    if drift:
+        raise TrackerError(
+            "Unrecorded target changes prevent verification: " + ", ".join(drift)
+            + ". Review and record the changes, then repeat the relevant validation before completing work."
+        )
     data["status"] = "verified"
     data["revision"] = int(data["revision"]) + 1
     data["updated"] = iso_utc()
@@ -1069,13 +1118,13 @@ def command_reconcile(_: argparse.Namespace) -> None:
     print("All active target hashes match their latest work records.")
 
 
-def configured_items_folder(base_text: str) -> str | None:
-    """Read the generated filter scalar, including earlier unquoted versions."""
+def dashboard_filter_expressions(base_text: str) -> list[str]:
+    """Read generated global filter scalars, including older unquoted versions."""
+    expressions = []
     for line in base_text.splitlines():
-        stripped = line.strip()
-        if not stripped.startswith("- "):
+        if not line.startswith("    - "):
             continue
-        expression = stripped[2:].strip()
+        expression = line[6:].strip()
         try:
             if expression.startswith('"'):
                 expression = json.loads(expression)
@@ -1087,11 +1136,18 @@ def configured_items_folder(base_text: str) -> str | None:
                 continue
             if not isinstance(expression, str):
                 continue
-            match = re.fullmatch(r'file\.inFolder\(("(?:\\.|[^"\\])*")\)', expression)
-            if match:
-                return json.loads(match.group(1))
+            expressions.append(expression)
         except json.JSONDecodeError:
             continue
+    return expressions
+
+
+def configured_items_folder(base_text: str) -> str | None:
+    """Read a legacy fixed-folder scope without treating it as portable."""
+    for expression in dashboard_filter_expressions(base_text):
+        match = re.fullmatch(r'file\.inFolder\(("(?:\\.|[^"\\])*")\)', expression)
+        if match:
+            return json.loads(match.group(1))
     return None
 
 
@@ -1126,13 +1182,13 @@ def validate_workspace() -> list[str]:
         base_text = base.read_text(encoding="utf-8")
         if "__ITEMS_FOLDER__" in base_text:
             errors.append("Workspace.base still contains an unresolved folder placeholder.")
-        else:
+        elif PORTABLE_ITEMS_FILTER not in dashboard_filter_expressions(base_text):
             configured_folder = configured_items_folder(base_text)
             vault_root = next((root for root in (PROJECT_ROOT, *PROJECT_ROOT.parents) if (root / ".obsidian").is_dir()), PROJECT_ROOT)
             expected_folder = ITEMS_DIR.relative_to(vault_root).as_posix()
             if configured_folder != expected_folder:
                 errors.append(
-                    f"Workspace.base folder does not match this vault layout: expected {expected_folder!r}, found {configured_folder!r}. Open the same shared vault root/layout as the team, or review setup --dry-run --upgrade-managed and rebase the generated dashboard for the agreed layout."
+                    f"Workspace.base folder does not match this vault layout: expected legacy folder {expected_folder!r}, found {configured_folder!r}. Review setup --dry-run --upgrade-managed to install the portable direct-open dashboard, or preserve a legacy dashboard only when its fixed folder matches this vault."
                 )
     try:
         records = all_records()

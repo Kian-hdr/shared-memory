@@ -22,3 +22,24 @@ jobs:
           python-version: ${{ matrix.python }}
       - run: python -m pip install -r requirements-dev.txt
       - run: python skills/setup-shared-project-workspace/scripts/test_workspace.py
+      - run: python skills/setup-shared-project-workspace/scripts/test_doctor.py
+      - run: python scripts/demo_workspace.py --output "${{ runner.temp }}/workspace-demo"
+      - run: python scripts/demo_workspace.py --layout existing-vault --output "${{ runner.temp }}/workspace-vault-demo"
+
+  product:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ['3.11', '3.13']
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m unittest discover -s product/tests -v
+      - name: Build exact product candidate
+        run: python scripts/build_product.py --output "${{ runner.temp }}/shared-memory.pyz"
+      - name: Inspect versioned package guide
+        run: python "${{ runner.temp }}/shared-memory.pyz" guide

@@ -44,6 +44,21 @@ Existing nonportable stored paths are diagnosed before use. Updating the
 tracker does not migrate records or change historical ownership; follow the
 [retrofit policy](retrofit-policy.md) for reviewed upgrades and record mapping.
 
+### Content fingerprints in tracker 1.3.0
+
+Files are hashed with streaming SHA-256, including files larger than 20 MiB.
+Directory hashes use `directory-sha256:` plus a digest of sorted descendant paths,
+file contents and directories. The tracker's own Coordination/Items subtree is
+excluded to avoid claims invalidating themselves. Directory symbolic links are
+rejected; choose exact file targets when appropriate. Narrow claims limit cost.
+
+When explicitly declaring changed targets, `change` rejects drift in other claimed
+targets instead of silently absorbing it. A child edit under a directory claim
+requires acknowledging the claimed directory after reviewing its other contents.
+`complete` rejects unrecorded drift before recording verification. Old `directory`
+and `too-large` baselines need owner review and a recorded change, not rewritten
+historical records. Neither hashing nor declared evidence authenticates an actor.
+
 ### Event
 
 Events are immutable. They capture a material state change, including before and after

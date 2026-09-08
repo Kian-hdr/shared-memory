@@ -47,13 +47,16 @@ must distinguish a valid installed workspace from a partially configured one.
 
 ## Collaboration mode
 
+- `local-only`: explicitly record local work with no remote propagation requirement.
 - `shared-folder`: use target hashes and reconciliation records for non-Git files.
 - `git`: store branch and commit evidence; Git controls exact diffs.
 - `hybrid`: use both and record which system controls each target.
 
 Automatic mode selects Git when the target or an enclosing directory contains `.git`;
 otherwise it selects shared-folder. This is a tracker mode, not a provider choice.
-A local-only directory can use shared-folder tracking with no remote configured.
+For new explicitly local work, choose local-only. Older local projects may still
+record shared-folder; review their actual access method rather than silently
+changing an existing managed section.
 Select hybrid explicitly when documentation and implementation have different homes.
 
 ## Portability upgrades
@@ -67,7 +70,16 @@ pass; preserve immutable history and do not remove another contributor's claims.
 There is no automatic record migration. Superseding a record alone does not clear
 legacy-path diagnostics in retained historical records.
 
-When moving a nested project to a different vault layout, the dashboard's folder
-scope must match the recipient's agreed layout. The validator reports mismatches.
-Preview and review the generated dashboard update before applying it. Do not call
-an arbitrary copied folder multi-user-ready based only on file existence.
+Version 1.3.0 generates a location-independent dashboard for direct main-content
+opening. Do not embed it or treat a contextual sidebar as the same query context.
+Legacy fixed-path dashboards still report layout mismatches; upgrading their
+managed generated content requires review. See [project-folder-sharing.md](project-folder-sharing.md).
+
+Version 1.3.0 also replaces the old `directory` and `too-large` fingerprint
+sentinels with content hashes. Existing active work using those sentinels will
+correctly report drift until its owner reviews the actual target content and
+records a change to establish the new baseline, with evidence and validation.
+Keep historical events unchanged. Review all changed claimed targets explicitly;
+`complete` now refuses unrecorded target drift. Prefer bounded targets because
+recursive hashing reads descendant files. Directory claims reject symbolic links;
+use reviewed exact file targets where appropriate.

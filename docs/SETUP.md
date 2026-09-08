@@ -1,11 +1,32 @@
-# Setup guide
+# Shared Memory setup guide
 
 Prefer agent-guided setup? [Copy this prompt into your own chat](../SETUP-PROMPT.md).
 It discovers your target and handles either owner setup or joining an existing project.
 
+## Ordinary folders are the default
+
+The core runs in a project folder using Python and Markdown. It does not need
+Obsidian, a vault, an app launch or an Obsidian account. Setup includes an inert
+Workspace.base dashboard file for users who want that optional view; the file is
+part of the generated package, not a runtime dependency on the Obsidian app.
+
+## Select a shared subfolder when using an existing vault
+
+For a project inside an existing vault, pass that project folder as the target.
+The setup writes inside it and preserves the parent vault, .obsidian and siblings.
+It does not create a nested vault, launch Obsidian, configure sharing or grant access.
+Use the [project-folder guide](../skills/setup-shared-project-workspace/references/project-folder-sharing.md)
+for different teammate vault layouts and private-parent boundaries.
+
+Example: select `My Vault/Projects/Client Alpha`, not `My Vault`. The teammate may
+keep the same shared folder at `Their Vault/Collaboration/Client Alpha`. Actual
+placement/synchronization depends on the chosen provider; it is not automatic.
+
 ## Dependencies and automatic local setup
 
-The full setup prompt authorizes the needed local installations and configuration.
+For explicitly requested full computer readiness, the setup prompt authorizes
+the needed local installations and configuration. Folder-only setup reuses working
+apps and does not require opening Obsidian.
 Its agent installs missing Obsidian, a compatible Python, and only the client or
 prerequisites required by your selected access method, then opens the correct vault.
 If you choose Homebrew and it is missing, the agent installs it, completes shell/PATH
@@ -16,6 +37,25 @@ protected OS interaction still apply, and the agent resumes after those handoffs
 See the skill's [local setup guide](../skills/setup-shared-project-workspace/references/local-setup.md)
 for supported installation routes and completion checks. The terminal commands below
 configure project files; they do not themselves install desktop apps or Homebrew.
+
+## Get a clear readiness report
+
+From a reviewed toolkit checkout, run this against the actual existing project:
+
+```bash
+python3 skills/setup-shared-project-workspace/scripts/doctor_workspace.py "/path/to/project"
+```
+
+Add `--json` for structured output. The doctor writes no project files and never
+executes the project's tracker. Exit 0 means the local structure validates against
+this toolkit version; exit 1 means unconfigured or blocked. It reports next steps,
+tracker digests and separate unverified app/access/receipt checks. A version
+mismatch is a review gate, not a reason to replace a teammate's tracker automatically.
+
+For a first look without touching real work, follow the [demo guide](DEMO.md).
+For your own local project, pass `--collaboration-mode local-only` in the setup
+commands below. `auto` retains compatibility with earlier detection behavior and
+does not establish whether a directory is actually shared.
 
 ## Before setup
 
@@ -28,8 +68,9 @@ Read existing vault and project instructions. Back up important files or create 
 appropriate Git checkpoint. Do not place this toolkit's Git checkout inside a
 cloud-synchronized vault just to run the setup script.
 
-Copy or merge the repository's root `AGENTS.md` into your vault root if you want
-the general navigation rules. Run the skill setup on the specific project that
+Copy or merge the repository's root `AGENTS.md` into your vault root only when
+vault-wide configuration is explicitly in scope. A shared subfolder needs its own
+project instructions without changing the private parent. Run the skill setup on the specific project that
 needs coordination, which may be the vault root or a project subfolder.
 
 ## macOS and Linux
@@ -112,13 +153,14 @@ py -3 skills/setup-shared-project-workspace/scripts/validate_workspace.py $proje
 | `--mode retrofit` | Extend an existing project, preserving surrounding content |
 | `--mode audit` | Inspect without changing the project |
 | `--mode auto` | Choose bootstrap or retrofit from directory contents |
+| `--collaboration-mode local-only` | Local coordination without remote propagation |
 | `--collaboration-mode shared-folder` | Record file targets and hashes for a shared folder |
 | `--collaboration-mode git` | Record branch and commit evidence; Git governs exact diffs |
 | `--collaboration-mode hybrid` | Coordinate documentation and code with separate authorities |
 
 Modes select tracking conventions; they do not install or configure a sync provider.
-`shared-folder` also handles a local-only directory: label its access method local-only
-and do not claim it is synchronized. Use `git` for a project in a Git checkout and
+Select `local-only` for explicitly local work. Older projects may retain
+`shared-folder` with no remote; inspect the actual access method before upgrading. Use `git` for a project in a Git checkout and
 `hybrid` only for an actual mix of authorities. The commands above use `auto`, which
 detects an enclosing Git checkout and otherwise uses file-mode tracking. Override it
 only to match an explicit workflow.
@@ -179,25 +221,8 @@ replace active work through the project's authorized coordination process.
 The toolkit has no automatic record migration. Adding a superseding record alone
 does not clear diagnostics for absolute paths retained in historical records.
 
-When copying a nested project, preserve the agreed vault-relative layout where
-possible. If it becomes a standalone vault, review the dashboard's scope with the
-current setup tool and apply the intended generated-file update. A recipient's
-home-directory name may differ; the shared project's internal layout is what matters.
-
-If an agent still requests an unexpected account or provider, inspect the exact
-prompt, installed skill, target `AGENTS.md`, and toolkit version it read. A stale or
-project-customized copy has its own instructions. Do not try logging in as the
-toolkit author to resolve a portability problem.
-
-## Troubleshooting
-
-- **Missing project home:** supply an existing `--project-home` or a real `--purpose`.
-- **Generated file drift:** inspect the difference and preserve customizations before
-  an explicitly reviewed upgrade.
-- **Unsigned existing file:** resolve ownership and naming; do not overwrite it.
-- **Invalid workspace:** report the exact validation failure; do not delete history
-  or another actor's records to make validation pass.
-- **Dashboard not visible:** verify the target is inside the intended Obsidian vault
-  and the installed app supports Bases. The tracker can still use Markdown records.
-- **Local checks pass, teammate cannot see changes:** inspect your storage provider's
-  sync and access state. Tracker `sync` refreshes context; it does not upload files.
+The 1.3.0 generated dashboard uses its own folder as its scope when opened directly
+in a main-content tab. Different parent vault layouts therefore do not require
+rewriting the same shared file. Embedded/sidebar context is not supported. Legacy
+fixed-path dashboards still validate against their recorded layout and require a
+reviewed generated-file upgrade. See the project-folder guide.

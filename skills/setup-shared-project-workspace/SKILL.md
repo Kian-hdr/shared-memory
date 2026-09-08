@@ -1,21 +1,36 @@
 ---
 name: setup-shared-project-workspace
-description: Set up, retrofit, or audit a portable Markdown or Obsidian workspace for people and AI agents, with ownership, dependencies, handoffs, validation, and a recipient-specific onboarding prompt. Discover the user's actual storage method and local environment; support local-only, Git, shared-folder, and hybrid workflows without requiring a particular account or provider. Do not use merely to manage ordinary tasks in an already configured workspace.
+description: Set up, retrofit, or audit an independent Markdown project folder for people and AI agents, with optional Obsidian integration, with ownership, dependencies, handoffs, validation, and a recipient-specific onboarding prompt. Discover the user's actual storage method and local environment; support local-only, Git, shared-folder, and hybrid workflows without requiring a particular account or provider. Do not use merely to manage ordinary tasks in an already configured workspace.
 ---
 
 # Set up a shared project workspace
 
-Create a lean, self-contained collaboration layer. Keep substantive instructions in
+Create an independent collaboration layer in an ordinary project folder. Python
+and Markdown are sufficient; Obsidian is optional. Do not install/open it or
+require a vault for normal folder setup. A selected folder inside an
+existing Obsidian vault can be the entire shared project; the parent vault stays
+private. For this workflow read [references/project-folder-sharing.md](references/project-folder-sharing.md).
+Configure the selected project root only. Do not open Obsidian, create/register a
+vault, or modify parent settings merely to set up a project folder. Keep substantive instructions in
 `AGENTS.md`; do not generate parallel explanation files.
 
-The setup and tracker require Python 3.9 or newer and use only its standard library.
+The legacy setup and tracker require Python 3.9 or newer and use only its standard library.
 Resolve `scripts/` paths relative to this skill directory, not the target project.
 Run `--help` for the setup or tracker command when its required inputs are unclear.
 For requested computer readiness or full setup, read
 [references/local-setup.md](references/local-setup.md). Complete missing dependencies,
-Obsidian launch/vault setup, and Homebrew installation/configuration when chosen.
+Obsidian launch/vault setup only when explicitly requested, and Homebrew installation/configuration when chosen.
 Existing authorization covers necessary local steps; do not ask again per package.
 Honor the recipient's enforced approval policies and required human interactions.
+
+## Select product or legacy toolkit
+
+For the **Shared Memory product**, a reviewed `.pyz` package, or a project containing
+`.shared-memory.json`, read [references/product-runtime.md](references/product-runtime.md)
+and follow the authoritative product commands. This skill folder alone contains
+the legacy advisory tracker, not the new engine. Preserve the existing mode; never
+silently replace unavailable product capabilities with advisory setup. The remaining
+workflow below applies to the legacy toolkit.
 
 ## Choose the mode
 
@@ -39,7 +54,12 @@ tracking model, repairing records, or explaining its fields in detail.
    work needs no cloud account, client, URL, or upload. A plain folder is not proof of sync.
 2. Follow all instructions already governing the target. Do not weaken or replace
    project-specific scope, security, approval, or evidence rules.
-3. For a retrofit, run the audit first:
+3. Use `scripts/doctor_workspace.py /absolute/project/path` for read-only onboarding
+   diagnostics (`--json` for structured output). It executes only the bundled trusted
+   validator, reports tracker mismatch and local errors, and leaves app/access/receipt
+   checks explicitly unverified. For explicitly local work, select
+   `--collaboration-mode local-only`. The doctor is not proof of shared readiness.
+   For a retrofit, run the audit first:
 
    ```bash
    python3 scripts/setup_workspace.py /absolute/project/path --mode audit

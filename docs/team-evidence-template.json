@@ -1,0 +1,138 @@
+{
+  "schema_version": 1,
+  "status": "not_run",
+  "runtime_sha256": null,
+  "bundle_id": null,
+  "project_id": null,
+  "coordinator": {
+    "host_owner": null,
+    "deployment_review": null,
+    "transport": "https",
+    "locator": "REDACTED",
+    "availability_and_recovery_evidence": null
+  },
+  "participants": [
+    {
+      "os_family": "Windows",
+      "os_version": null,
+      "python_version": null,
+      "agent_version": null,
+      "actor": null,
+      "independent_operator": null,
+      "selected_path_label": null,
+      "parent_before_hashes": {},
+      "parent_after_hashes": {},
+      "receipt": null
+    },
+    {
+      "os_family": "macOS",
+      "os_version": null,
+      "python_version": null,
+      "agent_version": null,
+      "actor": null,
+      "independent_operator": null,
+      "selected_path_label": null,
+      "parent_before_hashes": {},
+      "parent_after_hashes": {},
+      "receipt": null
+    },
+    {
+      "os_family": "Linux",
+      "os_version": null,
+      "python_version": null,
+      "agent_version": null,
+      "actor": null,
+      "independent_operator": null,
+      "selected_path_label": null,
+      "parent_before_hashes": {},
+      "parent_after_hashes": {},
+      "receipt": null
+    }
+  ],
+  "provider_routes": [],
+  "gates": {
+    "TEAM-01": {
+      "status": "not_run",
+      "evidence": [],
+      "expected": null,
+      "observed": null,
+      "limitations": []
+    },
+    "TEAM-02": {
+      "status": "not_run",
+      "evidence": [],
+      "expected": null,
+      "observed": null,
+      "limitations": []
+    },
+    "TEAM-03": {
+      "status": "not_run",
+      "evidence": [],
+      "expected": null,
+      "observed": null,
+      "limitations": []
+    },
+    "TEAM-04": {
+      "status": "not_run",
+      "evidence": [],
+      "expected": null,
+      "observed": null,
+      "limitations": []
+    },
+    "TEAM-05": {
+      "status": "not_run",
+      "evidence": [],
+      "expected": null,
+      "observed": null,
+      "limitations": []
+    },
+    "TEAM-06": {
+      "status": "not_run",
+      "evidence": [],
+      "expected": null,
+      "observed": null,
+      "limitations": []
+    },
+    "TEAM-07": {
+      "status": "not_run",
+      "evidence": [],
+      "expected": null,
+      "observed": null,
+      "limitations": []
+    },
+    "TEAM-08": {
+      "status": "not_run",
+      "evidence": [],
+      "expected": null,
+      "observed": null,
+      "limitations": []
+    },
+    "TEAM-09": {
+      "status": "not_run",
+      "evidence": [],
+      "expected": null,
+      "observed": null,
+      "limitations": []
+    },
+    "TEAM-10": {
+      "status": "not_run",
+      "evidence": [],
+      "expected": null,
+      "observed": null,
+      "limitations": []
+    },
+    "TEAM-11": {
+      "status": "not_run",
+      "evidence": [],
+      "expected": null,
+      "observed": null,
+      "limitations": []
+    }
+  },
+  "independent_review": {
+    "reviewer": null,
+    "decision": "not_run",
+    "unresolved": []
+  },
+  "contains_credentials": false
+}

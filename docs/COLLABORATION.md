@@ -1,7 +1,13 @@
-# Everyday collaboration
+# Everyday collaboration with Shared Memory
 
 Start with the actual project's `AGENTS.md`. The tracker examples below assume setup
 has completed and your terminal is in that project, not this toolkit repository.
+
+The shared unit may be one project folder inside each person's existing vault.
+Keep parent vaults private and configure only that folder. Follow the
+[project-folder guide](../skills/setup-shared-project-workspace/references/project-folder-sharing.md)
+for access boundaries and different local layouts; there is no need to open or
+create an Obsidian vault just to join a configured folder.
 
 ## Start a session
 
@@ -64,6 +70,11 @@ cannot be established. Coordinate directly with the owner through an authorized 
 Never assume an expired claim means a contributor has stopped.
 
 ## Handle changes and handoffs
+
+In 1.3.0, directory descendants and large files participate in drift checks.
+`complete` refuses unrecorded changes. If using `change --changed-target`, include
+all affected claimed targets after reviewing their actual contents. Prefer narrow
+claims; directory hashing reads descendants and rejects symbolic links.
 
 Record what changed, who owns it, validation and evidence, limitations, and the next
 action. Mark impact `none`, `compatible`, `breaking`, or `unknown`. Review stale

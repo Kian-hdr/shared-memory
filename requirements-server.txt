@@ -1,0 +1,4 @@
+# Optional self-hosted coordinator only. The local engine/client remain stdlib.
+uvicorn==0.52.4
+click==8.5.0
+h11==0.16.0

@@ -15,6 +15,7 @@ ASSETS = SKILL_ROOT / "assets"
 MANAGED_START = "<!-- shared-project-workspace:start schema=1 -->"
 MANAGED_END = "<!-- shared-project-workspace:end -->"
 GENERATED_SIGNATURE = "generated-by: setup-shared-project-workspace"
+PORTABLE_ITEMS_FILTER = 'this.file.ext == "base" && file.inFolder(this.file.folder + "/Items")'
 
 
 class SetupError(RuntimeError):
@@ -71,12 +72,16 @@ def find_vault_root(target: Path) -> Path | None:
     return None
 
 
-def dashboard_content(items_folder: str) -> str:
+def dashboard_content(items_folder: str | None = None) -> str:
+    template = (ASSETS / "workspace.base").read_text(encoding="utf-8")
+    if items_folder is None:
+        return template
+    # Retain explicit fixed-folder rendering for inspected legacy dashboards.
     expression = f"file.inFolder({json.dumps(items_folder, ensure_ascii=False)})"
     # JSON strings are YAML double-quoted scalars. Quote the whole expression as
     # well as its argument so colons, apostrophes and quotes in paths stay text.
-    return (ASSETS / "workspace.base").read_text(encoding="utf-8").replace(
-        'file.inFolder("__ITEMS_FOLDER__")', json.dumps(expression, ensure_ascii=False)
+    return template.replace(
+        "'" + PORTABLE_ITEMS_FILTER + "'", json.dumps(expression, ensure_ascii=False)
     )
 
 
@@ -93,14 +98,17 @@ Project home: `{project_home}`
 Collaboration mode: `{mode}`  
 Coordination schema: `1`
 Workspace skill: `setup-shared-project-workspace`
-Workspace skill version: `1.2.0`
+Workspace skill version: `1.3.0`
 
 ### Canonical state
 
 - Read the project home for purpose, scope, team, systems of record, and deliverables.
 - Current work lives in `Coordination/Items/WORK-*.md`.
 - Immutable change, handoff, and decision records preserve history.
-- `Coordination/Workspace.base` is the Obsidian dashboard.
+- Open `Coordination/Workspace.base` directly in Obsidian's main content area.
+  Its scope follows this shared project's location inside each person's own vault.
+  Embedding the dashboard or placing it in a sidebar changes its query context and
+  is unsupported. Keep private parent-vault folders and settings outside the share.
 - Git controls exact code diffs when present; coordination records control ownership,
   semantic progress, dependencies, impact, evidence, and handoff context.
 
@@ -242,7 +250,7 @@ def main() -> int:
     parser.add_argument("--project-name")
     parser.add_argument("--project-home")
     parser.add_argument("--purpose", help="Required only when a new README.md project home is created")
-    parser.add_argument("--collaboration-mode", choices=["auto", "shared-folder", "git", "hybrid"], default="auto")
+    parser.add_argument("--collaboration-mode", choices=["auto", "local-only", "shared-folder", "git", "hybrid"], default="auto")
     parser.add_argument("--actor", help="Stable actor ID for the setup decision")
     parser.add_argument("--initiated-by", help="Human who initiated setup")
     parser.add_argument("--agent", help="Agent that performed setup")
@@ -277,10 +285,8 @@ def main() -> int:
         home_label = project_home.relative_to(target).as_posix()
         coordination = target / "Coordination"
         items = coordination / "Items"
-        vault_root = find_vault_root(target)
-        items_folder = items.relative_to(vault_root).as_posix() if vault_root else "Coordination/Items"
         planned = {
-            "Coordination/Workspace.base": dashboard_content(items_folder),
+            "Coordination/Workspace.base": dashboard_content(),
             "Coordination/project_tracker.py": (ASSETS / "project_tracker.py").read_text(encoding="utf-8"),
         }
 

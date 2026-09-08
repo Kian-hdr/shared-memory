@@ -1,5 +1,16 @@
 # Portable teammate onboarding
 
+## Project-folder scope comes first
+
+A selected shared folder inside an existing vault does not require a new vault,
+app launch or changes to parent .obsidian settings. For folder-only setup, reuse
+working components, configure/join only the project, and report UI checks as
+unverified without blocking file setup. The full desktop installation/opening
+steps below apply only when requested. Follow
+[project-folder-sharing.md](project-folder-sharing.md) for different local vault
+layouts, approved self-contained instructions and private-parent boundaries.
+
+
 Use after workspace setup or when asked to onboard someone to an existing project.
 Return the completed prompt in chat. Read [local-setup.md](local-setup.md) for local
 installations and [storage-access.md](storage-access.md) for the selected access method.
@@ -42,6 +53,7 @@ available local tools, reuse working components, and resume after required user
 handoffs. Do not just return a checklist.
 
 Project: {{PROJECT_NAME}}
+Setup scope: {{FOLDER_ONLY_OR_FULL_COMPUTER_SETUP}}
 Workflow and actual storage/access method: {{WORKFLOW_AND_ACCESS_METHOD}}
 Approved access locator or local-only status: {{ACCESS_LOCATOR_OR_NONE}}
 Project path relative to accessible root: {{PROJECT_RELATIVE_PATH}}
@@ -100,7 +112,10 @@ use an OS facility, Git, or an existing app instead of a separate desktop sync c
 Verify current official platform support; report unsupported routes rather than
 silently changing the team's workflow.
 
-3. Load the project and connect my agent and Obsidian.
+3. Load the selected project and connect my agent.
+For folder-only scope, keep the existing vault and .obsidian settings untouched;
+do not open Obsidian or create/register a vault. Treat app checks below as optional
+unless full computer setup or visual verification is requested.
 Read all accessible governing instructions and the existing project home. Check the
 expected project files and tracker provenance before executing shared code. Verify
 the supplied digest and inspect the script. If it differs, obtain the owner's reviewed
@@ -113,7 +128,7 @@ discovery. Confirm ownership, checkpoints, evidence, and handoff rules are under
 The sender's skill need not be installed. If a new session is needed, give the exact
 local project path and a continuation prompt.
 
-Unless I requested Markdown-only work or declined Obsidian, install it if missing
+For requested full desktop setup, unless I requested Markdown-only work or declined Obsidian, install it if missing
 via the selected supported Homebrew route or https://obsidian.md/download. Follow
 https://help.obsidian.md/install, launch the app, and open the correct existing folder
 as a vault. Preserve configuration and avoid a duplicate/nested vault. Do not install
@@ -142,7 +157,8 @@ Give the actual local paths, access method, actor ID, reused/installed dependenc
 PATH changes, app/vault checks, tracker validation, and any relevant propagation
 result. State locally configured, shared collaboration ready, partially configured,
 or blocked according to actual evidence. For shared readiness, required installs and
-app/vault checks must pass (or Obsidian be explicitly omitted), the agent must load the
+any explicitly requested app/vault checks must pass; folder-only setup does not
+require those app checks, the agent must load the
 rules, the tracker must validate, and the chosen workflow's access and propagation
 must be verified. A local-only workspace may be fully locally configured without an
 account or remote. Identify unfinished checks and the smallest next action. Complete

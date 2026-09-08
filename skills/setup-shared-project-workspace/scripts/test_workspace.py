@@ -12,11 +12,13 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 import yaml
 
 SKILL_ROOT = Path(__file__).resolve().parent.parent
 SETUP = SKILL_ROOT / "scripts" / "setup_workspace.py"
+PORTABLE_ITEMS_FILTER = 'this.file.ext == "base" && file.inFolder(this.file.folder + "/Items")'
 
 
 def load_script(name: str, path: Path):
@@ -371,6 +373,88 @@ class WorkspaceTests(unittest.TestCase):
         self.change()
         self.tracker("reconcile")
 
+    def test_directory_claim_detects_descendant_content_and_structure_changes(self) -> None:
+        folder = self.root / "notes"
+        folder.mkdir()
+        document = folder / "document.md"
+        document.write_text("Original\n", encoding="utf-8")
+        self.claim(target="notes")
+        self.tracker("check", "--actor", "taylor-codex", "--work-id", "ARCH-001")
+        for action in ("edit", "add", "rename", "delete", "empty-directory"):
+            with self.subTest(action=action):
+                if action == "edit":
+                    document.write_text("Changed\n", encoding="utf-8")
+                elif action == "add":
+                    (folder / "added.md").write_text("Added\n", encoding="utf-8")
+                elif action == "rename":
+                    (folder / "added.md").rename(folder / "renamed.md")
+                elif action == "delete":
+                    (folder / "renamed.md").unlink()
+                else:
+                    (folder / "empty").mkdir()
+                self.tracker("check", "--actor", "taylor-codex", "--work-id", "ARCH-001", expected=1)
+                self.change()
+                self.tracker("check", "--actor", "taylor-codex", "--work-id", "ARCH-001")
+        recipient = self.root.parent / "Recipient"
+        shutil.copytree(self.root, recipient)
+        self.run_command([sys.executable, str(recipient / "Coordination/project_tracker.py"),
+                          "check", "--actor", "taylor-codex", "--work-id", "ARCH-001"])
+
+    def test_root_directory_hash_excludes_tracker_owned_records(self) -> None:
+        self.claim(target=".")
+        self.tracker("check", "--actor", "taylor-codex", "--work-id", "ARCH-001")
+        self.tracker("sync", "--actor", "taylor-codex")
+        self.change()
+        self.tracker("heartbeat", "--actor", "taylor-codex", "--work-id", "ARCH-001")
+        self.tracker("check", "--actor", "taylor-codex", "--work-id", "ARCH-001")
+        self.tracker("validate")
+
+    def test_directory_symlink_is_rejected_without_writes(self) -> None:
+        folder = self.root / "notes"
+        folder.mkdir()
+        (self.root / "document.md").write_text("Original\n", encoding="utf-8")
+        try:
+            (folder / "linked.md").symlink_to(self.root / "document.md")
+        except OSError:
+            self.skipTest("Symbolic links unavailable on this platform")
+        before = snapshot(self.root)
+        result = self.tracker(
+            "claim", "--work-id", "LINK", "--title", "Link", "--actor", "new-actor",
+            "--owner", "Jordan", "--agent", "Codex", "--initiated-by", "Jordan",
+            "--target", "notes", "--objective", "Test", "--acceptance", "Done",
+            "--next-action", "Test", expected=1,
+        )
+        self.assertIn("symbolic link", result.stderr)
+        self.assertEqual(before, snapshot(self.root))
+
+    def test_change_rejects_undeclared_drift_without_mutating_records(self) -> None:
+        self.claim(target="a.md", extra=["--target", "b.md"])
+        (self.root / "a.md").write_text("Reported edit\n", encoding="utf-8")
+        (self.root / "b.md").write_text("Unreported edit\n", encoding="utf-8")
+        before = snapshot(self.root)
+        result = self.change(extra=["--changed-target", "a.md"], expected=1)
+        self.assertIn("b.md", result.stderr)
+        self.assertEqual(before, snapshot(self.root))
+        self.tracker("reconcile", expected=1)
+        self.change(extra=["--changed-target", "a.md", "--changed-target", "b.md"])
+        self.tracker("reconcile")
+        events = [read_note(path)[0] for path in (self.root / "Coordination/Items").glob("EVENT-*.md")]
+        event = next(data for data in events if data["event_type"] == "change")
+        self.assertEqual(event["changed_targets"], ["a.md", "b.md"])
+
+    def test_child_change_cannot_absorb_other_drift_under_directory_claim(self) -> None:
+        folder = self.root / "notes"
+        folder.mkdir()
+        self.claim(target="notes")
+        (folder / "a.md").write_text("Reported\n", encoding="utf-8")
+        (folder / "b.md").write_text("Unreported\n", encoding="utf-8")
+        before = snapshot(self.root)
+        result = self.change(extra=["--changed-target", "notes/a.md"], expected=1)
+        self.assertIn("notes", result.stderr)
+        self.assertEqual(before, snapshot(self.root))
+        self.change(extra=["--changed-target", "notes"])
+        self.tracker("reconcile")
+
     def test_exact_acceptance_criteria_and_completion_gate(self) -> None:
         self.claim()
         self.change(extra=["--pass-criterion", "2"])
@@ -390,6 +474,65 @@ class WorkspaceTests(unittest.TestCase):
         self.change(actor="jordan-codex", expected=1)
         self.tracker("accept-handoff", "--actor", "jordan-codex", "--work-id", "ARCH-001", "--summary", "Reviewed handoff", "--next-action", "Continue implementation")
         self.change(actor="jordan-codex")
+
+    def test_large_exact_file_content_drift_is_detected(self) -> None:
+        document = self.root / "large.bin"
+        with document.open("wb") as handle:
+            handle.seek(21 * 1024 * 1024)
+            handle.write(b"A")
+        self.claim(target="large.bin")
+        data, _ = read_note(self.work_path())
+        recorded = json.loads(data["target_hashes"][0])["sha256"]
+        self.assertEqual(recorded, hashlib.sha256(document.read_bytes()).hexdigest())
+        self.tracker("check", "--actor", "taylor-codex", "--work-id", "ARCH-001")
+        with document.open("r+b") as handle:
+            handle.seek(21 * 1024 * 1024)
+            handle.write(b"B")
+        before = snapshot(self.root)
+        self.tracker("check", "--actor", "taylor-codex", "--work-id", "ARCH-001", expected=1)
+        self.assertEqual(before, snapshot(self.root))
+        self.change()
+        self.tracker("reconcile")
+
+    def test_complete_rejects_unrecorded_drift_without_writes(self) -> None:
+        self.claim()
+        self.change(extra=["--pass-criterion", "1", "--pass-criterion", "2"])
+        (self.root / "architecture.md").write_text("Unrecorded after validation\n", encoding="utf-8")
+        before = snapshot(self.root)
+        result = self.tracker(
+            "complete", "--actor", "taylor-codex", "--work-id", "ARCH-001",
+            "--summary", "Complete", "--evidence", "test.log", "--validation", "Tests passed", expected=1,
+        )
+        self.assertIn("Unrecorded target changes", result.stderr)
+        self.assertEqual(before, snapshot(self.root))
+        self.assertEqual(read_note(self.work_path())[0]["status"], "in_progress")
+        self.change(extra=["--evidence", "test.log", "--validation", "Revalidated changed output"])
+        self.tracker("complete", "--actor", "taylor-codex", "--work-id", "ARCH-001",
+                     "--summary", "Complete", "--evidence", "test.log", "--validation", "Revalidated changed output")
+        self.assertEqual(read_note(self.work_path())[0]["status"], "verified")
+
+    def test_legacy_hash_sentinels_require_explicit_review_without_history_rewrite(self) -> None:
+        for work_id, target, old_hash in (("FILE", "file.md", "too-large"), ("DIR", "notes", "directory")):
+            with self.subTest(old_hash=old_hash):
+                if old_hash == "directory":
+                    (self.root / target).mkdir()
+                else:
+                    (self.root / target).write_text("Original\n", encoding="utf-8")
+                self.claim(work_id=work_id, target=target)
+                self.change(work_id=work_id, extra=["--pass-criterion", "1", "--pass-criterion", "2"])
+                path = self.work_path(work_id)
+                data, body = read_note(path)
+                data["target_hashes"] = [json.dumps({"path": target, "sha256": old_hash})]
+                write_note(path, data, body)
+                before = snapshot(self.root)
+                self.tracker("check", "--actor", "taylor-codex", "--work-id", work_id, expected=1)
+                self.tracker("complete", "--actor", "taylor-codex", "--work-id", work_id,
+                             "--summary", "Complete", "--evidence", "test.log", "--validation", "Tests passed", expected=1)
+                self.assertEqual(before, snapshot(self.root))
+                history = {p: p.read_bytes() for p in (self.root / "Coordination/Items").glob("EVENT-*.md")}
+                self.change(work_id=work_id, extra=["--summary", "Reviewed legacy hash and current file contents"])
+                self.tracker("check", "--actor", "taylor-codex", "--work-id", work_id)
+                self.assertTrue(all(p.read_bytes() == content for p, content in history.items()))
 
     def test_stale_claim_is_detected_and_renewed(self) -> None:
         self.claim()
@@ -453,7 +596,7 @@ class WorkspaceTests(unittest.TestCase):
 
     def test_base_yaml_and_view_structure(self) -> None:
         base = yaml.safe_load((self.root / "Coordination" / "Workspace.base").read_text())
-        self.assertIn('file.inFolder("Coordination/Items")', base["filters"]["and"])
+        self.assertIn(PORTABLE_ITEMS_FILTER, base["filters"]["and"])
         names = {view["name"] for view in base["views"]}
         self.assertTrue({"Current work", "Recent activity", "Open handoffs", "Stale claims"}.issubset(names))
         self.assertTrue(all(view["type"] == "table" for view in base["views"]))
@@ -465,7 +608,7 @@ class WorkspaceTests(unittest.TestCase):
         target.mkdir(parents=True)
         self.setup_project(target)
         base = yaml.safe_load((target / "Coordination" / "Workspace.base").read_text())
-        self.assertIn('file.inFolder("Projects/Nested/Coordination/Items")', base["filters"]["and"])
+        self.assertIn(PORTABLE_ITEMS_FILTER, base["filters"]["and"])
         self.assertEqual(read_note(target / "README.md")[0]["type"], "project")
 
     def test_dashboard_special_characters_roundtrip_through_yaml(self) -> None:
@@ -491,7 +634,7 @@ class WorkspaceTests(unittest.TestCase):
         self.setup_project(target)
         installed = (target / "Coordination" / "Workspace.base").read_text(encoding="utf-8")
         installed_filters = yaml.safe_load(installed)["filters"]["and"]
-        self.assertIn('file.inFolder("Projects/Team\'s café ‘notes’/Coordination/Items")', installed_filters)
+        self.assertIn(PORTABLE_ITEMS_FILTER, installed_filters)
         self.run_command([sys.executable, str(target / "Coordination" / "project_tracker.py"), "validate"])
 
     def test_dashboard_layout_change_is_detected_and_reviewed_rebase_works(self) -> None:
@@ -500,6 +643,11 @@ class WorkspaceTests(unittest.TestCase):
         target = vault / "Projects" / "Nested"
         target.mkdir(parents=True)
         self.setup_project(target)
+        setup_module = load_script("workspace_legacy_setup_fixture", SETUP)
+        (target / "Coordination/Workspace.base").write_text(
+            setup_module.dashboard_content("Projects/Nested/Coordination/Items"), encoding="utf-8"
+        )
+        self.run_command([sys.executable, str(target / "Coordination/project_tracker.py"), "validate"])
         recipient = Path(self.temporary.name) / "CopiedProjectVault"
         shutil.copytree(target, recipient)
         (recipient / ".obsidian").mkdir()
@@ -512,6 +660,58 @@ class WorkspaceTests(unittest.TestCase):
         self.assertEqual(before, snapshot(recipient))
         self.setup_project(recipient, ["--upgrade-managed"])
         self.run_command([sys.executable, str(recipient / "Coordination" / "project_tracker.py"), "validate"])
+
+    def test_shared_project_relocates_between_private_vaults_without_shared_writes(self) -> None:
+        owner_vault = self.root.parent / "OwnerVault"
+        recipient_vault = self.root.parent / "RecipientVault"
+        for vault in (owner_vault, recipient_vault):
+            (vault / ".obsidian").mkdir(parents=True)
+            (vault / ".obsidian/private-settings.json").write_text('{"private": true}\n', encoding="utf-8")
+            (vault / "Private.md").write_text("Private notes stay local\n", encoding="utf-8")
+        private_before = {vault: snapshot(vault) for vault in (owner_vault, recipient_vault)}
+        target = owner_vault / "Projects/Team"
+        target.mkdir(parents=True)
+        self.setup_project(target)
+        recipient = recipient_vault / "Shared/Collaborations/Team"
+        shutil.copytree(target, recipient)
+        before = snapshot(target)
+        self.assertEqual(before, snapshot(recipient))
+        for project in (target, recipient):
+            self.run_command([sys.executable, str(project / "Coordination/project_tracker.py"), "validate"])
+            self.assertEqual(before, snapshot(project))
+            self.assertFalse((project / ".obsidian").exists())
+        for vault, original in private_before.items():
+            current = snapshot(vault)
+            self.assertTrue(all(current.get(path) == digest for path, digest in original.items()))
+
+    def test_portable_dashboard_filter_contract_excludes_siblings_and_note_embeds(self) -> None:
+        # Exercise the emitted expression against documented Bases semantics.
+        # This is a contract test, not evidence of native Obsidian rendering.
+        base = yaml.safe_load((self.root / "Coordination/Workspace.base").read_text())
+        filters = base["filters"]["and"]
+        self.assertIn(PORTABLE_ITEMS_FILTER, filters)
+        for folder in ("Projects/Team/Coordination", "Shared/Collaborations/Team/Coordination"):
+            record_paths = [folder + "/Items/WORK-ONE.md", folder + "/Items-copy/WORK-OTHER.md",
+                            "Private/Coordination/Items/WORK-PRIVATE.md", "OtherTeam/Coordination/Items/WORK-OTHER.md"]
+            def selected(context_ext: str) -> list[str]:
+                context = SimpleNamespace(file=SimpleNamespace(ext=context_ext, folder=folder))
+                result = []
+                for path in record_paths:
+                    record = SimpleNamespace(ext="md", inFolder=lambda value: path == value or path.startswith(value + "/"))
+                    if all(eval(expression.replace("&&", "and"), {"__builtins__": {}},
+                                {"this": context, "file": record}) for expression in filters):
+                        result.append(path)
+                return result
+            self.assertEqual(selected("base"), [record_paths[0]])
+            self.assertEqual(selected("md"), [])
+            self.assertEqual(selected("canvas"), [])
+
+    def test_portable_dashboard_requires_context_guard(self) -> None:
+        path = self.root / "Coordination/Workspace.base"
+        path.write_text(path.read_text().replace('this.file.ext == "base" && ', ''), encoding="utf-8")
+        before = snapshot(self.root)
+        self.tracker("validate", expected=1)
+        self.assertEqual(before, snapshot(self.root))
 
     def test_git_and_hybrid_modes(self) -> None:
         root = Path(self.temporary.name) / "GitProject"

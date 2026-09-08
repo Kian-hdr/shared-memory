@@ -1,7 +1,21 @@
-# Shared Obsidian Workspace
+# Shared Memory
 
-A copyable `AGENTS.md` and a complete agent skill for organizing a Markdown or
-Obsidian workspace shared by multiple people and AI agents.
+**A shared workspace for your team and its AI agents.**
+
+Shared Memory is the product name. The repository remains
+[`Kian-hdr/shared-obsidian-workspace`](https://github.com/Kian-hdr/shared-obsidian-workspace);
+existing setup links and technical identifiers remain valid.
+
+An independent coordination product for ordinary project folders and AI agents.
+Readable Markdown holds project knowledge and instructions. The development
+runtime coordinates ownership, proposals, accepted revisions and handoffs;
+**Obsidian is optional** and never required to install, open or use the core.
+
+Existing Obsidian users can share the same project folder inside their own private
+vaults. You do not need a new vault or to share your private parent vault.
+
+The repository includes a copyable `AGENTS.md`, a complete setup skill, the product
+runtime and a legacy advisory Python tracker. [See the project-folder workflow](skills/setup-shared-project-workspace/references/project-folder-sharing.md).
 
 The instructions cover navigation, ownership, evidence, synchronization checkpoints,
 and handoffs. The optional Python tracker adds work records, target claims, dependency
@@ -11,18 +25,45 @@ Use your own folder, repository, storage provider, and account. Local-only work 
 no online account. The public GitHub address below is the software source; it does
 not connect you to the maintainer's vault or Google Drive.
 
-This is a coordination toolkit, not a sync service or an Obsidian plugin. File claims
-are advisory; they cannot prevent simultaneous offline edits on different computers.
+The legacy tracker uses advisory file claims. The development engine adds
+authoritative proposal acceptance and recoverable file materialization. Neither
+controls external editors or configures a provider’s sharing permissions.
+
+## Try the legacy toolkit's local handoff demo
+
+Run the [two-person demo](docs/DEMO.md) in a disposable plain-folder fixture.
+An optional mode also tests a project within an existing-vault fixture. It uses actual
+tracker commands to demonstrate separate work, a rejected conflicting claim,
+an accepted handoff and verified completion. It uses fictional actors on one
+computer and needs no cloud account. It does not launch independent AI agents.
+
+**Maturity: early toolkit for controlled pilots.** Review the
+[production-readiness roadmap](docs/READINESS.md) before adopting it for critical
+or large-scale work. Published 1.2.0 has known drift-detection gaps; the local
+1.3.0 candidate adds fixes and a reproducible demo pending publication.
+
+## Authoritative product development build
+
+The [Shared Memory operating guide](docs/PRODUCT-V1.md) describes the **0.2.0
+development build**: a local SQLite authority, authenticated team protocol, atomic
+revision acceptance, preserved conflicts/offline drafts, recoverable file updates,
+owner/recipient setup and verified package installation/rollback. It requires Python
+3.11+. Obsidian remains optional.
+
+Local tests and a packaged TLS rehearsal do not establish cloud-provider delivery,
+real recipient onboarding or mixed-OS TEAM-11. Stable V1 is not complete. The
+[readiness roadmap](docs/READINESS.md) retains those gates and the deferred GitHub
+launch rename. The historical advisory toolkit and 0.1.0 preview remain documented
+separately; current public main may lag this local development candidate.
 
 ## Let your agent set it up
 
 **[Copy the setup prompt into your own chat](SETUP-PROMPT.md).** No placeholders
-need editing. The prompt guides a local agent through finding your vault, installing
-the toolkit, preserving existing instructions, setting up or joining the correct
-project, and checking the result. It directs the agent to install missing Obsidian,
-Python, and only the dependencies of your selected access method. If you choose Homebrew, it installs
-and configures Homebrew too. It continues under your setup authorization, respecting
-your agent's approval settings and any required authentication or OS interaction.
+need editing. The prompt guides a local agent through selecting your project folder, preserving
+existing instructions, setting up or joining the correct project, and checking the
+result. The folder can already live inside a private vault. Optional installation
+and access setup depend on your chosen workflow and authorization; Obsidian setup
+is only included when you request it.
 
 ## Get it
 
@@ -37,7 +78,11 @@ git clone https://github.com/Kian-hdr/shared-obsidian-workspace.git
 cd shared-obsidian-workspace
 ```
 
-## Choose how much you need
+## Legacy toolkit options
+
+For the authoritative runtime, follow [the product guide](docs/PRODUCT-V1.md)
+using an explicitly reviewed `.pyz` and its external SHA-256. The options below
+install the historical advisory toolkit; they do not install the team coordinator.
 
 | Option | What to copy | Result |
 | --- | --- | --- |
@@ -47,7 +92,7 @@ cd shared-obsidian-workspace
 
 ### Instructions only
 
-Copy [AGENTS.md](AGENTS.md) into your vault root. If that file already exists, merge
+Copy [AGENTS.md](AGENTS.md) into the selected project folder. If that file already exists, merge
 the relevant sections rather than replacing your existing rules. Keep any stricter
 privacy, approval, and project-specific requirements. The instructions discover the
 recipient's environment rather than assuming the source author's account or paths.
@@ -79,12 +124,12 @@ See [the setup guide](docs/SETUP.md) for copyable terminal commands, Windows gui
 existing-vault preservation, generated files, and validation.
 
 Setup and the tracker require **Python 3.9+** and only its standard library.
-Obsidian is installed by the full setup prompt for Obsidian workflows; an explicitly
-Markdown-only workflow can omit it. The notes are ordinary Markdown. Viewing `Workspace.base`
+The ordinary-folder workflow uses no Obsidian installation. Full desktop setup
+can install Obsidian when explicitly requested. The notes are ordinary Markdown. Viewing `Workspace.base`
 requires an Obsidian installation that supports Bases. Python tests additionally
 require PyYAML, which is a development dependency only.
 
-## How teammates work together
+## How teammates use the legacy toolkit
 
 1. The owner configures the actual shared project once.
 2. Teammates obtain authorized access through that project's actual access method.
@@ -115,8 +160,9 @@ keeps provider-specific instructions separate from the generic setup. The toolki
 does not supply storage, subscriptions, accounts, or access to someone else's files.
 
 Shared file targets and project-home references use project-relative paths so each
-person can keep the project under a different local root. Keep the agreed vault
-layout, or review and regenerate dashboard scope after moving a nested project.
+person can keep the project under a different local root. The portable dashboard is opened directly as a main-content Base tab; embedding
+or contextual sidebar use is not supported by its relative scope. Legacy fixed-path
+dashboards require a reviewed upgrade.
 See [updating an existing workspace](docs/SETUP.md#updating-an-existing-workspace)
 before upgrading an older tracker or transferred copy.
 
@@ -142,6 +188,7 @@ LICENSE                          MIT license
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements-dev.txt
 .venv/bin/python skills/setup-shared-project-workspace/scripts/test_workspace.py
+.venv/bin/python skills/setup-shared-project-workspace/scripts/test_doctor.py
 ```
 
 On Windows, use `.venv\Scripts\python.exe` instead of `.venv/bin/python`.
@@ -149,7 +196,24 @@ The regression suite uses disposable temporary projects. It checks setup preserv
 ownership conflicts, stale dependencies, validation, and handoffs. It does not prove
 cloud upload, another computer's receipt, or the Obsidian dashboard's visual behavior.
 
-See [VALIDATION.md](VALIDATION.md) for the publication checks and their limits.
+See [VALIDATION.md](VALIDATION.md) for current local checks, historical publication evidence and their limits.
+
+## Product direction
+
+Windows, macOS and Linux are first-class targets for the core, CLI and agent
+workflow from the start. Equivalent behavior and same-project mixed-device
+collaboration are required release criteria, not inferred from portable source.
+Provider/account/OS support is tracked separately in the [capability matrix](docs/READINESS.md#provideraccountos-capability-and-verification-matrix).
+The authenticated server and local folder receipt adapters are implemented.
+Reachable hosted/self-hosted deployment, vendor API adapters and real provider
+delivery still need implementation or validation; Obsidian is optional throughout.
+
+Strengthen the independent folder/Markdown core and consistent agent interfaces
+first. After real workflows are validated, a lightweight companion can expose
+folder selection, work ownership, change review and handoff acceptance. A later
+optional Obsidian plugin should reuse the same core, not implement a second
+tracker. Neither interface is included in this candidate. See the
+[roadmap](docs/READINESS.md) for evidence gates and architecture limits.
 
 ## License
 

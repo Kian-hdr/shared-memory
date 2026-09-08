@@ -2,7 +2,7 @@
 filters:
   and:
     - file.ext == "md"
-    - file.inFolder("__ITEMS_FOLDER__")
+    - 'this.file.ext == "base" && file.inFolder(this.file.folder + "/Items")'
 properties:
   title:
     displayName: Work

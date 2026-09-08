@@ -1,5 +1,17 @@
 # Local dependencies and app setup
 
+## Project-folder scope comes first
+
+Ordinary project folders require no Obsidian app. A selected shared folder inside
+an existing vault does not require a new vault,
+app launch or changes to parent .obsidian settings. For folder-only setup, reuse
+working components, configure/join only the project, and report UI checks as
+unverified without blocking file setup. The full desktop installation/opening
+steps below apply only when requested. Follow
+[project-folder-sharing.md](project-folder-sharing.md) for different local vault
+layouts, approved self-contained instructions and private-parent boundaries.
+
+
 Use when the recipient requests computer readiness or full workspace setup. A request
 to audit a project or write an onboarding prompt does not itself request installations.
 Apply the recipient's existing authorization to the necessary local steps below.
@@ -8,7 +20,7 @@ Apply the recipient's existing authorization to the necessary local steps below.
 
 The full setup prompt authorizes required local installs, their prerequisites,
 minimal PATH configuration, app launch, and opening the chosen vault. Install missing
-Obsidian for an Obsidian workflow, a compatible Python, and only the components needed
+Obsidian only for explicitly requested Obsidian desktop setup, a compatible Python, and only the components needed
 by the actual access method in [storage-access.md](storage-access.md). Local-only
 work needs no cloud account/client; Git and some sharing methods use different tools.
 If the recipient chooses Homebrew, that choice includes
