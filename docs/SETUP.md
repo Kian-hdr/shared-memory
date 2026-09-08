@@ -1,24 +1,35 @@
 # Shared Memory setup routes
 
-Prefer agent-guided setup? [Copy this prompt into your own chat](../SETUP-PROMPT.md).
-It discovers your target and handles either owner setup or joining an existing project.
+## Start with your own agent
 
-## Experimental product setup
+1. [Copy the setup prompt](../SETUP-PROMPT.md) into an agent connected to your computer.
+2. Select an existing project folder or choose a new folder.
+3. Let the agent install missing authorized prerequisites, verify release **v0.2.0**, run setup and check the local receipt.
 
-For **v0.2.0-alpha.1** (runtime version `0.2.0`), use the
-[product operating guide](PRODUCT-V1.md#obtain-and-install-the-exact-reviewed-package).
-Verify the actual release archive against its external `SHA256SUMS` before execution.
-Use Python 3.11+ and your own selected project folder plus separate private local
-state. First trials belong in disposable projects or backed-up working copies.
+Runtime `0.2.0` needs Python 3.11+. Your agent discovers or installs it and verifies
+`shared-memory-0.2.0.pyz` against the release's external `SHA256SUMS` before execution.
+A selected subfolder inside an existing private Obsidian vault is valid. No app launch,
+new vault, disposable copy or cloud account is required for local operation.
 
-- **Owner:** `init` creates the project's authority. Local-only needs no server or account; schema 2 is an explicit configuration for session coordination.
-- **Teammate:** `attach` uses your own member token, expected project ID, reachable authorized endpoint and local paths. Joining does not initialize or upgrade the authority.
-- **Existing product client:** use `refresh`, `team-status` and `receipt`; preserve drafts and recovery state.
+`setup PROJECT` creates or resumes the local project using deterministic private
+state and a stable identity when none is supplied. It preserves existing project
+content and keeps tokens, drafts, backups and SQLite outside the shared folder.
+The agent can create the new folder you selected, fix routine prerequisites and rerun
+interrupted setup with its original state. It must preserve authority, journals and
+drafts rather than reset them to clear errors. See the
+[operating guide](PRODUCT-V1.md#agent-guided-setup) for commands and exact limits.
 
-The product is a CLI/runtime, not a native app or hosted service. A selected subfolder
-inside your private Obsidian vault is valid; ordinary folder setup does not launch
-Obsidian or alter vault settings. Provider access and independent-device acceptance
-remain separate from successful local setup.
+To join an existing authority, use your own member credential, expected project ID
+and the operator's authorized reachable endpoint with setup's explicit join inputs.
+Never create a second authority for the same project. Cross-computer operation requires
+verified TLS and an operator who keeps that service reachable; the package does not
+automatically deploy a server or provide managed hosting. Local receipt, independent
+recipient checks and Google Drive/OneDrive/iCloud delivery remain separate results.
+
+The advanced `init`, `attach`, session coordination, backup and migration interfaces
+are documented in the [product operating guide](PRODUCT-V1.md). Broader acceptance
+gates remain tracked in [readiness](READINESS.md), without becoming mandatory steps
+for ordinary local onboarding.
 
 ## Legacy advisory tracker setup
 

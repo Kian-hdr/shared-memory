@@ -417,6 +417,49 @@ class SetupRecoveryTests(unittest.TestCase):
         args[args.index('--actor') + 1] = 'corrected-owner'
         self.assertEqual(self.run_cli(args)['data']['receipt']['readiness'], 'ready')
 
+    def test_missing_established_authority_never_recreates_revision_zero(self):
+        project, state = self.fixture('lost-authority'); args = self.init_args(project, state)
+        self.run_cli(args)
+        self.coordinator(project, state, 'claim', {'assignment_id': 'edit', 'targets': ['Home.md'],
+            'criteria': ['verify'], 'dependencies': [], 'resource_limits': {'max_proposals': 2}, 'integration_owner': 'owner'})
+        self.coordinator(project, state, 'propose', {'proposal_id': 'change', 'base_revision': 0,
+            'changes': {'Home.md': 'ACCEPTED-LATER\n'}, 'evidence': 'Synthetic fixture', 'assignment_id': 'edit'})
+        self.coordinator(project, state, 'accept', {'proposal_id': 'change', 'validation': 'Reviewed fixture', 'reason': 'Acceptance'})
+        self.run_cli(['refresh', str(project), '--state-dir', str(state)])
+        authority = state / 'coordinator.sqlite3'
+        retained = self.root / 'retained-authority.sqlite3'
+        authority.rename(retained)
+        # A missing generated credential must not trigger repair before loss of
+        # established authority has been identified.
+        (state / 'member.token').unlink()
+        before = {str(p.relative_to(self.root)): p.read_bytes() for p in self.root.rglob('*') if p.is_file()}
+        result = self.run_cli(args, expected=3)
+        self.assertEqual(result['code'], 'authority_missing')
+        self.assertFalse(authority.exists())
+        self.assertFalse((state / 'member.token').exists())
+        self.assertEqual({str(p.relative_to(self.root)): p.read_bytes() for p in self.root.rglob('*') if p.is_file()}, before)
+
+    def test_owner_import_excludes_credential_paths_and_preserves_their_bytes(self):
+        project, state = self.fixture('private-import')
+        originals = {'credentials/account.md': b'PRIVATE-ACCOUNT\n', 'Secrets.md': b'PRIVATE-SECRET\n',
+                     'runtime/session.md': b'PRIVATE-RUNTIME\n'}
+        for name, data in originals.items():
+            path = project / name; path.parent.mkdir(parents=True, exist_ok=True); path.write_bytes(data)
+        result = self.run_cli(self.init_args(project, state))
+        self.assertEqual(result['data']['receipt']['readiness'], 'ready')
+        snapshot = self.coordinator(project, state, 'snapshot')
+        for name, data in originals.items():
+            self.assertNotIn(name, snapshot['files'])
+            self.assertEqual((project / name).read_bytes(), data)
+            for private in (state / 'client').rglob('*'):
+                if private.is_file():
+                    self.assertNotIn(data.strip(), private.read_bytes())
+        explicit, explicit_state = self.fixture('private-explicit')
+        (explicit / 'secrets.md').write_bytes(b'PRIVATE-EXPLICIT\n')
+        result = self.run_cli(self.init_args(explicit, explicit_state) + ['--include', 'secrets.md'], expected=3)
+        self.assertEqual(result['code'], 'target_invalid')
+        self.assertFalse((explicit / '.shared-memory.json').exists())
+
     def test_virgin_lock_never_rewrites_magic_after_another_contender_acquires_it(self):
         # Reproduce the old race deterministically: a stale fstat(size=0) in A
         # resumed only after B wrote magic and acquired its independent OS lock.

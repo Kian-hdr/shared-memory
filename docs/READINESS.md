@@ -7,7 +7,28 @@ The product name is Shared Memory. Obsidian is optional. The product repository 
 and protocol identifiers retain compatibility. The
 name is a product decision; trademark and domain clearance are unverified.
 
-## Experimental prerelease policy
+## First normal release and retained roadmap
+
+The first normal release is **v0.2.0**, superseding alpha-only onboarding. Its
+release path is paste the setup prompt, select an existing or new folder, and let
+the local agent finish prerequisites, setup and recoverable repairs. No disposable
+trial or new Obsidian vault is required. Existing identity, accepted history,
+credentials and unrelated content must survive re-runs.
+
+The release freezes additions to this journey, useful local operation and joining
+an existing authenticated coordinator. Cross-computer sharing requires an actual
+reachable operator-owned TLS host and a distinct member credential. Local setup
+does not provision hosting. OneDrive/iCloud adapters, managed hosting, independent
+recipient/provider acceptance and broader roadmap work remain separate workstreams.
+The code does not include the isolated, unintegrated OneDrive metadata prototype.
+
+All TEAM, COORD and GRAPH requirements below remain tracked. A normal version
+number is not evidence that every V1 graduation gate, provider, scale or operating
+environment passed. The versioned [validation record](../VALIDATION.md) preserves
+successful checks and their limits. Optional GUI/plugin ideas remain exploratory;
+they do not delay this release's agent-based journey.
+
+## Historical experimental prerelease policy
 
 Public experimental publication is authorized for **v0.2.0-alpha.1**, with runtime
 version `0.2.0`. This supersedes the earlier private-until-finished-V1 restriction.
@@ -30,7 +51,7 @@ beyond the original Obsidian workspace toolkit. This supersedes the earlier plan
 to rename the toolkit repository at first-version launch. The product uses
 `Kian-hdr/shared-memory`; the original repository remains a separate legacy toolkit
 record, with access controlled independently. The original private-until-V1 plan is
-superseded by the experimental prerelease policy above. Source history and attribution
+superseded first by the experimental prerelease and then by the normal release above. Source history and attribution
 are preserved.
 
 Current setup, clone and download navigation point to the product repository.

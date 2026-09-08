@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build reviewed alpha release assets from a clean Git checkout, without publishing.
+"""Build reviewed release assets from a clean Git checkout, without publishing.
 
 Requires Python 3.11+ and Git. No downloads, credentials or third-party packages.
 Use a fresh output directory outside the source checkout.
@@ -95,8 +95,8 @@ def release(output: Path, version: str) -> dict:
     root = ROOT.resolve()
     if output == root or root in output.parents:
         raise ValueError("Release output must be outside the source checkout")
-    if not re.fullmatch(re.escape(PRODUCT_VERSION) + r"-alpha\.[1-9][0-9]*", version):
-        raise ValueError("Release version must match the runtime version with -alpha.N")
+    if not re.fullmatch(re.escape(PRODUCT_VERSION) + r"(?:-alpha\.[1-9][0-9]*)?", version):
+        raise ValueError("Release version must match the runtime version, optionally with -alpha.N")
     source_revision, sources = committed_source()
     verify_checkout(source_revision, sources)
     required = {"LICENSE", "SETUP-PROMPT.md", "assets/shared-memory.svg", "assets/shared-memory.png",
@@ -118,7 +118,7 @@ def release(output: Path, version: str) -> dict:
     icons["LICENSE"] = sources["LICENSE"]
     archive(output / f"shared-memory-icons-{version}.zip", icons)
     manifest = {
-        "release_tag": "v" + version, "maturity": "experimental_alpha", "stable_v1": False,
+        "release_tag": "v" + version, "maturity": "experimental_alpha" if "-alpha." in version else "release", "stable_v1": False,
         "source_repository": "https://github.com/Kian-hdr/shared-memory",
         "source_revision": source_revision, "source_dirty": False,
         "runtime_version": PRODUCT_VERSION, "runtime_asset": package.name,
@@ -147,7 +147,7 @@ def release(output: Path, version: str) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--release-version", default="0.2.0-alpha.1")
+    parser.add_argument("--release-version", default=PRODUCT_VERSION)
     args = parser.parse_args()
     print(json.dumps(release(args.output, args.release_version), indent=2))
 

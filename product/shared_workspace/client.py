@@ -285,20 +285,34 @@ class Client:
         finally:
             os.close(fd)
 
-    def _walk(self):
+    def _walk(self, required=None):
         """Inspect managed entries before descent; excluded state stays opaque."""
+        from .knowledge import PRIVATE, PRIVATE_FILES
+        required = set(required or ())
+        excluded = getattr(self, '_excluded', [])
         _no_symlinks(self.root)
         for directory, dirs, names in os.walk(self.root, followlinks=False):
             _no_symlinks(Path(directory))
             for name in list(dirs):
                 child = Path(directory) / name
+                relative = child.relative_to(self.root).as_posix()
                 if name.casefold() in PROTECTED:
                     dirs.remove(name)
+                elif ((name.startswith('.') or name.casefold() in PRIVATE)
+                      and not any(p.startswith(relative + '/') for p in required)):
+                    dirs.remove(name)
+                    excluded.append({'path': relative, 'reason': 'untracked-private-directory'})
                 else:
                     _no_symlinks(child)
             managed = [name for name in names if name.casefold() not in PROTECTED
                        and not name.startswith('.shared-memory-write-')]
-            for name in managed:
+            for name in list(managed):
+                relative = (Path(directory) / name).relative_to(self.root).as_posix()
+                if (relative not in required and
+                        (name.startswith('.') or name.casefold() in PRIVATE | PRIVATE_FILES)):
+                    managed.remove(name)
+                    excluded.append({'path': relative, 'reason': 'untracked-private-file'})
+                    continue
                 _no_symlinks(Path(directory) / name)
             yield directory, dirs, managed
 
@@ -306,7 +320,7 @@ class Client:
         files = {}
         required = set(required or ())
         self._excluded = []
-        for directory, dirs, names in self._walk():
+        for directory, dirs, names in self._walk(required):
             for name in names:
                 relative = (Path(directory) / name).relative_to(self.root).as_posix()
                 path = self._target(relative)

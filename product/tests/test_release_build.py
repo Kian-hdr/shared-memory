@@ -15,7 +15,7 @@ import zipfile
 
 
 ROOT = Path(__file__).resolve().parents[2]
-VERSION = '0.2.0-alpha.1'
+VERSION = '0.2.0'
 
 
 class ReleaseBuildTests(unittest.TestCase):
@@ -128,6 +128,8 @@ class ReleaseBuildTests(unittest.TestCase):
             self.assertEqual(kit.read(package_name), assets[package_name])
             self.assertTrue(all(entry.create_system == 3 for entry in kit.infolist()))
         manifest = json.loads(assets['RELEASE-MANIFEST.json'])
+        self.assertEqual(manifest['maturity'], 'release')
+        self.assertFalse(manifest['stable_v1'])
         self.assertEqual(manifest['source_revision'], self.revision)
         self.assertFalse(manifest['source_dirty'])
         self.assertEqual(manifest['runtime_sha256'], hashlib.sha256(assets[package_name]).hexdigest())

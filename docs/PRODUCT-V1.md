@@ -1,16 +1,26 @@
-# Shared Memory: operating the experimental prerelease
+# Shared Memory 0.2.0: operating guide
 
 **A shared workspace for your team and its AI agents.**
 
-Product **0.2.0**, prerelease **v0.2.0-alpha.1**, contains the authoritative engine
-and local client. It is experimental software for controlled trials in disposable
-projects or backed-up working copies. Obsidian is optional; no native application or
-hosted service is included. Actual provider receipt, independent-person onboarding
-and full TEAM-11 remain stable-V1 graduation gates. Automated cross-OS runner
-results are recorded separately in [validation](../VALIDATION.md).
+Release **v0.2.0**, runtime **0.2.0**, provides the authoritative engine and local
+client. Select an existing project or a new folder, including a project subfolder
+inside your private vault. Obsidian is optional.
+
+For ordinary setup, [paste the setup prompt into your agent](../SETUP-PROMPT.md),
+choose the folder and let the agent complete the local work. It discovers or installs
+missing authorized prerequisites, verifies the release, runs `setup PROJECT`, resumes
+recoverable interruptions and checks the resulting receipt. A disposable project
+is optional, not an onboarding requirement.
+
+Local setup needs no cloud account or server. Team access from another computer
+requires an operator-owned reachable authenticated TLS coordinator and the recipient's
+own membership. Managed hosting is not included. Local setup, live provider delivery
+and independent-recipient acceptance have separate evidence in
+[validation](../VALIDATION.md); the [full product requirements](READINESS.md) remain
+tracked without becoming a prerequisite checklist for local use.
+
 The product source is [Kian-hdr/shared-memory](https://github.com/Kian-hdr/shared-memory).
-Executable/protocol identifiers retain compatibility. Toolkit 1.3.0 and historical
-CLI 0.1.0 are separate versions.
+Toolkit 1.3.0 and the historical CLI 0.1.0 are separate versions.
 
 ## What is installed and shared
 
@@ -56,8 +66,8 @@ repeated permission requests; protected sign-in/MFA/OS consent and actual sharin
 permission changes remain their own gates.
 
 Obtain a specific reviewed package and its expected SHA-256 from the approved
-source. The expected alpha asset names are `shared-memory-0.2.0-alpha.1.pyz` and
-`SHA256SUMS` on [v0.2.0-alpha.1](https://github.com/Kian-hdr/shared-memory/releases/tag/v0.2.0-alpha.1).
+source. The release asset names are `shared-memory-0.2.0.pyz` and
+`SHA256SUMS` on [v0.2.0](https://github.com/Kian-hdr/shared-memory/releases/tag/v0.2.0).
 Download only assets actually present there; otherwise obtain an explicitly reviewed
 source revision or package. The checksum is external to the executable archive. It
 checks downloaded bytes against the trusted release source; a package's own hashes
@@ -95,7 +105,7 @@ must not exist and its parent must already exist. The builder records source com
 dirty status and bundle identity; it does not download dependencies. A local source
 build is separate evidence from the published release package.
 
-For a distributable alpha, use `python scripts/build_release.py --output FRESH_DIRECTORY`
+For a distributable release, use `python scripts/build_release.py --output FRESH_DIRECTORY`
 from a reviewed, committed checkout. Keep that fresh output outside the checkout.
 The release builder takes every payload from exact Git HEAD blobs, compares tracked
 working bytes directly, and emits the runtime, complete source/runtime kit, skill,
@@ -107,10 +117,70 @@ ZIP order, timestamps and creator metadata are fixed; byte reproducibility still
 requires matching Python/compressor behavior. Verify the published artifact's own
 external checksum rather than substituting a locally rebuilt hash.
 
+## Agent-guided setup
+
+After verifying and installing the exact package, inspect its command help and run:
+
+```text
+python PACKAGE.pyz setup --help
+python PACKAGE.pyz setup PROJECT
+```
+
+Use the returned private state path for subsequent `team-status`, `receipt`, `refresh`
+and work commands. The agent discovers the intended existing folder or creates the
+new folder you selected before invoking setup. It also installs missing Python and
+corrects routine local prerequisites under the setup request; the CLI itself does
+not install an interpreter or launch another agent.
+
+Setup chooses a deterministic private state location and stable local identity when
+none is supplied. It reuses an existing saved connection and immutable setup intent,
+and reports authenticated project state and the local receipt. Keep the reported
+state location: it contains the authority or client history, not a disposable cache.
+A repeated setup must resume that identity rather than create another authority.
+The default identity uses your local account name, a new actor ID retained in the
+setup intent and the agent label `Local agent`; optional `--person`, `--actor`,
+`--agent` and `--purpose` set owner details on first setup. Fresh local setup uses
+schema 1. Existing state, schema and membership are never silently replaced or upgraded.
+
+The default state is under your platform's private application/state directory in
+`Shared Memory/projects/`, keyed by the canonical selected path. `--state-dir` can
+select another private local location. Always use the returned `state_dir`, especially
+when continuing an existing installation that originally used an explicit location.
+A moved project requires its documented binding/migration route, not a new identity.
+
+For joining, supply your own issued credential and the operator's access details:
+
+```text
+python PACKAGE.pyz setup MY_PROJECT --endpoint https://COORDINATOR --token-file MY_PRIVATE_TOKEN --expected-project-id PROJECT_ID
+```
+
+The expected ID can be read from an existing valid project marker. `--provider`
+selects the intended route on fresh setup; an existing marker supplies it otherwise.
+`--ca-file` supports an authorized private CA. `--database` selects an existing
+same-machine authority instead of an endpoint and must never point to synchronized
+or network SQLite. Joining takes its identity from the issued member token, so omit
+owner identity overrides. Interrupted joins retain their original access binding.
+
+Each agent keeps its own conversation and history. Accepted project context, work
+ownership, proposals and handoffs are shared through the engine. For concurrent
+schema-2 workers, open separate authenticated sessions with bounded grants; a shared
+folder alone does not establish a session or grant authority.
+
+When setup is interrupted, rerun with the same folder and private state. Preserve
+its original inputs, private intent, credential and recovery journal. The agent can
+complete missing prerequisites and documented recovery, then recheck status and
+receipt. Identity mismatches, missing authority, unavailable membership, corruption
+and unresolved conflicts are explicit boundaries, not permission to reset history.
+Excluded artifacts or local divergence may produce a partial receipt; report and
+preserve them rather than deleting files to make the receipt complete.
+
+The explicit `init` and `attach` interfaces below remain available for operators and
+custom configuration. Ordinary users can stay in the setup-prompt flow.
+
 ## Owner setup
 
-Choose one existing project folder. It can live inside a private vault; its parent,
-siblings and `.obsidian` settings are not the shared unit. Choose a fresh private
+For explicit `init`, choose one existing project folder. It can live inside a private
+vault; its parent, siblings and `.obsidian` settings are not the shared unit. Choose a fresh private
 state directory on local, non-synchronized storage outside that project.
 
 ```text
@@ -144,8 +214,8 @@ replacing existing target files. This capability still needs validation on each
 chosen provider folder/client; core OS CI does not establish provider compatibility.
 
 The old `create/join/doctor/status/work/teammate-prompt` commands remain the advisory
-tracker compatibility interface. Use `init/attach/refresh/team-status` for the new
-authoritative workflow. Do not confuse their guarantees.
+tracker compatibility interface. Use `setup` and `init/attach/refresh/team-status`
+for the authoritative workflow. Do not confuse their guarantees.
 
 ## Team transport and joining
 
@@ -195,7 +265,7 @@ It never overwrites a different private connection.
 
 ## Session-based coordination
 
-New projects can explicitly enable schema 2 with `init --coordination-file CONFIG.json`.
+Advanced owner setup can explicitly enable schema 2 with `init --coordination-file CONFIG.json`.
 Keep that file in private local storage. Its bounded configuration is:
 
 ```json
@@ -494,14 +564,15 @@ inspect the separate `local` receipt and preserved drafts after application.
 Locally modified removed files remain protected. Remote historical revisions are
 retained, so a removed local file does not imply remote erasure.
 
-Actual Google Drive account delivery, independent recipients, provider revocation,
-offline reconciliation and mixed-device TEAM acceptance remain unexecuted gates.
-Local rclone fixtures and synthetic cross-OS tests do not establish those results.
+Actual provider/account delivery, provider revocation and complete independent-recipient
+TEAM acceptance require their own evidence. Consult the versioned validation record
+for completed offline, recovery and mixed-device checks; local rclone fixtures do not
+establish live provider delivery. These advanced checks do not prevent local setup.
 
 ## Migration and release gates
 
 `migration-plan SOURCE --destination FRESH_TARGET` is read-only. It inventories
-hashes and excluded private state. In development after alpha.1, `link_analysis`
+hashes and excluded private state. Its `link_analysis`
 uses the same bounded graph analyser as `graph`: Markdown/reference links,
 wikilinks, aliases, anchors, ambiguity, excluded references and parser limits are
 reported together. The original `external_or_unresolved_wikilinks` field remains
@@ -514,13 +585,13 @@ detected during the audit refuse the plan; this is not a filesystem lock against
 concurrent editors. It does not move files,
 change sharing or authorize migration. For live data, follow its owner's backup,
 working-copy and explicit target-approval requirements as a separate operation.
-An alpha setup trial is not authorization to restructure a live vault or backup drive.
+Ordinary setup is not authorization to restructure a live vault or backup drive.
 
-The development build has local transaction, recovery, package and TLS evidence.
+The validation record separates local transaction, recovery, package and TLS evidence.
 Limits: 10 MiB per accepted text file, 100 MiB accepted snapshot, 10,000 files,
 128 MiB protocol envelope. These bounds are not a tested production capacity.
 Automated Windows/macOS/Linux execution and HTTPS runner rehearsals are bounded
 engineering evidence. Actual provider/account routes, independent recipients and
-complete same-project mixed-device TEAM-11 remain stable-V1 graduation gates.
-An experimental prerelease does not mark those gates passed. See
+complete same-project mixed-device TEAM-11 remain broader acceptance requirements.
+Publishing v0.2.0 does not mark unexecuted gates passed or require them before local use. See
 [validation](../VALIDATION.md) and [the readiness roadmap](READINESS.md).

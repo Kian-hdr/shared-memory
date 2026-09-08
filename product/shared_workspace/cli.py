@@ -1,4 +1,4 @@
-"""Versioned JSON boundary for the Shared Workspace CLI preview."""
+"""Versioned JSON boundary for the Shared Memory CLI."""
 
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from . import delivery_workflow
 from . import knowledge_workflow
 from . import coordination_workflow
 from . import graph_rename
+from . import onboarding
 
 COMMANDS = ("version", "guide", "capabilities", "create", "join", "doctor", "status", "work", "teammate-prompt")
 
@@ -27,7 +28,7 @@ class Parser(argparse.ArgumentParser):
 
 
 def parser() -> argparse.ArgumentParser:
-    result = Parser(prog="shared-workspace", description="Selected-folder collaboration CLI preview with explicit revision delivery.")
+    result = Parser(prog="shared-workspace", description="Shared Memory selected-folder collaboration and explicit revision delivery.")
     result.add_argument("--bundle", help="Explicit reviewed built directory or package for source-mode execution")
     commands = result.add_subparsers(dest="command", required=True, parser_class=Parser)
     commands.add_parser("version", help="Show exact package identity and build provenance")
@@ -58,18 +59,20 @@ def parser() -> argparse.ArgumentParser:
     knowledge_workflow.add_commands(commands)
     coordination_workflow.add_commands(commands)
     graph_rename.add_commands(commands)
+    onboarding.add_commands(commands)
     return result
 
 
 def capabilities() -> dict:
     return {
-        "commands": list(COMMANDS) + list(workflow.TEAM_COMMANDS) + list(maintenance.COMMANDS) + list(delivery_workflow.COMMANDS) + list(knowledge_workflow.COMMANDS) + list(coordination_workflow.COMMANDS) + list(graph_rename.COMMANDS),
+        "commands": list(COMMANDS) + list(workflow.TEAM_COMMANDS) + list(maintenance.COMMANDS) + list(delivery_workflow.COMMANDS) + list(knowledge_workflow.COMMANDS) + list(coordination_workflow.COMMANDS) + list(graph_rename.COMMANDS) + list(onboarding.COMMANDS),
         "implemented": {"selected_folder_setup": True, "portable_project_identity": True,
                         "trusted_bundle_execution": True, "json_output": True,
                         "advisory_claims_handoffs_and_evidence": True,
                         "atomic_coordinator_acceptance": True, "authenticated_membership": True,
                         "preserved_offline_drafts": True, "recoverable_materialization": True,
-                        "reviewed_package_installation": True, "local_receipt_verification": True},
+                        "reviewed_package_installation": True, "local_receipt_verification": True,
+                        "resumable_selected_folder_onboarding": True},
         "coordination_extension": {"opt_in_schema": 2, "default_schema": 1,
                                    "commands": list(coordination_workflow.COMMANDS),
                                    "explicit_session_credentials": True, "automatic_renewal": False,
@@ -93,7 +96,7 @@ def capabilities() -> dict:
                              "TEAM-04": "bounded_local_coverage_only",
                              **{f"TEAM-{number:02d}": "local_engine_contract_coverage_only" for number in (3, 5, 6, 7, 8, 9)},
                              "TEAM-10": "live_provider_not_run", "TEAM-11": "mixed_os_not_run"},
-        "release_status": "preview", "stable_v1": False,
+        "release_status": "release", "stable_v1": False,
         "python": {"minimum": "3.11", "rehearsal_baseline": "3.13"},
         "mixed_os_acceptance": "not_run", "hosted_remote_readiness": "unverified",
     }
@@ -132,10 +135,12 @@ def main(argv=None) -> int:
         args = parser().parse_args(arguments)
         command = args.command
         for name in ("person", "actor", "agent", "purpose"):
-            if hasattr(args, name) and not getattr(args, name).strip():
+            if getattr(args, name, None) is not None and not getattr(args, name).strip():
                 raise ProductError(2, "usage_error", f"--{name} cannot be empty.")
         with open_bundle(args.bundle) as bundle:
-            if command in graph_rename.COMMANDS:
+            if command in onboarding.COMMANDS:
+                data = onboarding.dispatch(bundle, args)
+            elif command in graph_rename.COMMANDS:
                 data = graph_rename.dispatch(bundle, args)
             elif command in coordination_workflow.COMMANDS:
                 data = coordination_workflow.dispatch(bundle, args)

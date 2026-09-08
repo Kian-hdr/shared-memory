@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a self-contained product preview zipapp without downloads or installation."""
+"""Build a self-contained product zipapp without downloads or installation."""
 from __future__ import annotations
 
 import argparse
@@ -28,7 +28,7 @@ def fail(code, message, exit_code):
 
 
 if sys.version_info < (3, 11):
-    fail("unsupported_runtime", "Product preview requires Python 3.11 or newer; use a maintained Python such as 3.13.", 2)
+    fail("unsupported_runtime", "Shared Memory requires Python 3.11 or newer; use a maintained Python such as 3.13.", 2)
 try:
     with zipfile.ZipFile(sys.argv[0]) as archive:
         names = archive.namelist()

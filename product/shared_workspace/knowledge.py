@@ -41,7 +41,7 @@ ATTACHMENTS = {'.pdf', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.avif'
 PRIVATE = PROTECTED | {'node_modules', '__pycache__', 'venv', 'runtime', 'sessions',
                        'credentials', 'secrets', 'tokens', 'oauth', 'backups', 'cache'}
 PRIVATE_FILES = {'auth.json', 'credentials.json', 'secrets.json', 'token.json',
-                 'credentials.md', 'secrets.md', 'tokens.md'}
+                 'credentials.md', 'secrets.md', 'tokens.md', 'member.token', 'connection.json'}
 RELATIONS = {'project': 'project', 'projects': 'project', 'decision': 'decision',
              'decisions': 'decision', 'evidence': 'evidence', 'source': 'evidence',
              'sources': 'evidence', 'work': 'work', 'work_records': 'work',

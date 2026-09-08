@@ -240,11 +240,9 @@ class SharedPathPrimitiveTests(unittest.TestCase):
                 (root / folder).mkdir()
                 (root / folder / 'Private.md').write_bytes(b'PRIVATE-EXCLUDED')
             actual = workflow.initial_files(root, None)
-            # credentials is not in the authority's reserved set: preserve its
-            # existing import semantics rather than adopting graph-only exclusions.
+            # New imports exclude private trees without changing the validity
+            # of paths in already accepted authority history.
             expected = {'Home.md': '# Home\r\nNo final newline', 'Notes/Note.md': 'Mixed Δ\r\nLF\nCR\r'}
-            if 'credentials' not in engine.PROTECTED:
-                expected['credentials/Private.md'] = 'PRIVATE-EXCLUDED'
             if os.name == 'nt':
                 expected['Upper.MD'] = 'Platform glob case fixture'
             self.assertEqual(actual, expected)

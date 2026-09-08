@@ -1,6 +1,19 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
+
+Normal public release with a direct agent-guided entry point: paste the setup
+prompt, select a folder, and complete setup. Obsidian remains optional.
+
+- `setup` discovers saved project binding, supplies private local defaults for new
+  owners, resumes interrupted setup and preserves edits as recoverable drafts.
+  Existing team projects join their original authority using their own membership.
+- Missing established authority fails safely instead of recreating revision zero.
+- Default imports and untracked scans exclude credential/runtime paths while
+  preserving their files. Existing accepted history is not silently reclassified.
+- The prompt, skill and complete normal release package use the same workflow.
+  Local use requires Python; cross-computer use requires an authorized reachable
+  coordinator with verified TLS and separately issued member credentials.
 
 - Migration dry runs use the bounded graph analyser for Markdown, wikilinks,
   aliases and anchors, preserving explicit ambiguity and parser-limit diagnostics.

@@ -4,10 +4,9 @@ Use this route when the user requests the Shared Memory product or supplies a
 reviewed product `.pyz`, rather than the historical advisory Markdown tracker.
 Do not silently substitute a legacy toolkit for an unavailable product package.
 
-The experimental prerelease is **v0.2.0-alpha.1**, with runtime version **0.2.0**.
-Use a disposable project or backed-up working copy for an initial trial. Select
-`shared-memory-0.2.0-alpha.1.pyz` and its entry in external `SHA256SUMS` only when
-present on the [release page](https://github.com/Kian-hdr/shared-memory/releases/tag/v0.2.0-alpha.1).
+The release is **v0.2.0**, with runtime version **0.2.0**. Select
+`shared-memory-0.2.0.pyz` and its entry in external `SHA256SUMS` only when
+present on the [release page](https://github.com/Kian-hdr/shared-memory/releases/tag/v0.2.0).
 Verify downloaded bytes before execution, then run `version`, `capabilities` and
 `guide`. Read the operating guide bundled with that exact artifact. If assets are
 absent, ask for the intended reviewed package/source; do not run arbitrary latest
@@ -19,7 +18,15 @@ path for later commands. It does not install Python, add a global command or dep
 a server. The optional complete skill archive must preserve its directory structure
 and any existing installation during review.
 
-- `init` creates one authority for a new selected folder; `attach` joins an existing
+- Use `setup PROJECT` for normal onboarding. Discover compatible Python and the
+  selected folder, install missing prerequisites within authorization, then inspect
+  `setup --help` and run the command. It selects private local state, creates a new
+  local owner or resumes the original saved binding, and verifies an authenticated
+  current receipt. Existing team folders require the recipient's own membership
+  and authority access; never fall back to a new local authority. Re-running setup
+  recovers interrupted setup and materialization, preserving drafts. Missing accepted
+  history, changed identity and credentials require specific recovery rather than reset.
+- Advanced `init` creates one authority for a new selected folder; `attach` joins an existing
   expected project with the recipient's own token and local paths. Never bootstrap
   during join. Existing private parent-vault files and `.obsidian` remain untouched.
 - Private non-synced local state holds SQLite, tokens, connection settings and drafts.
@@ -48,6 +55,6 @@ requests. Provider permissions, credentials/protected sign-in, messages, deploym
 publication and purchases remain their actual gates. Report unsupported OS/provider
 combinations and incomplete live/mixed-device checks rather than calling them ready.
 
-Experimental publication does not establish stable V1. Distinguish automated OS/HTTPS
+This release does not establish complete V1 acceptance. Distinguish automated OS/HTTPS
 fixtures from independent recipients, actual provider delivery and persistent operations.
 The product is an independent folder runtime; no native app or hosted service is included.

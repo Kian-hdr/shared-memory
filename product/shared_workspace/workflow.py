@@ -132,7 +132,7 @@ def selected_root(value):
 
 
 def initial_files(root, includes):
-    from .engine import PROTECTED
+    from .knowledge import PRIVATE, PRIVATE_FILES
     if includes:
         selected = [root / name for name in includes]
     else:
@@ -143,19 +143,25 @@ def initial_files(root, includes):
             if unsafe_ancestor(directory) is not None:
                 raise ProductError(3, "target_invalid", "Included paths cannot traverse links or reparse points.")
             dirs[:] = [name for name in dirs if not name.startswith('.') and name != 'Coordination'
-                       and name.casefold() not in PROTECTED]
+                       and name.casefold() not in PRIVATE]
             for name in dirs:
                 if unsafe_ancestor(Path(directory) / name) is not None:
                     raise ProductError(3, "target_invalid", "Included paths cannot traverse links or reparse points.")
             selected.extend(Path(directory) / name for name in names
                             if (name.casefold() if os.name == 'nt' else name).endswith('.md')
-                            and name.casefold() not in PROTECTED)
+                            and not name.startswith('.')
+                            and name.casefold() not in PRIVATE | PRIVATE_FILES)
     files = {}
     for path in selected:
         if not path.is_relative_to(root):
             raise ProductError(3, "target_invalid", "Included files must remain inside the selected project.")
         relative = path.relative_to(root)
-        if any(part.startswith(".") or part == "Coordination" for part in relative.parts[:-1]):
+        if (any(part.casefold() in PRIVATE for part in relative.parts)
+                or relative.name.casefold() in PRIVATE_FILES):
+            if includes:
+                raise ProductError(3, "target_invalid", "Private runtime and credential paths cannot be imported as knowledge.")
+            continue
+        if any(part.startswith(".") or part == "Coordination" for part in relative.parts):
             if includes:
                 raise ProductError(3, "target_invalid", "Protected hidden/legacy state cannot be imported as knowledge.")
             continue
@@ -311,6 +317,9 @@ def _setup_binding(root, args):
         if getattr(args, "coordination_file", None) is not None:
             from .coordination import validate_configuration
             binding["coordination"] = validate_configuration(json_file(private_path(args.coordination_file, root)))
+        elif getattr(args, "coordination_config", None) is not None:
+            from .coordination import validate_configuration
+            binding["coordination"] = validate_configuration(args.coordination_config)
     else:
         binding.update(project_id=args.expected_project_id, token_file=str(private_path(args.token_file, root)),
                        database=str(private_path(args.database, root)) if args.database else None,
@@ -385,6 +394,9 @@ def _initial_authority(state, intent):
     if final.exists():
         verify(final)
         return
+    root = Path(binding["project_root"])
+    if (root / MANIFEST).exists() or (state / "client").exists():
+        raise ProductError(3, "authority_missing", "The established authority is missing. Preserve private state and restore a verified authority backup; setup will not recreate accepted history.")
     if staging.exists():
         try:
             verify(staging)
@@ -495,6 +507,9 @@ def _setup(root, state, args):
             _publish_setup_json(intent_path, intent)
         _check_setup_state(root, state, intent, binding)
         connection = _setup_connection(binding, state)
+        if (args.command == "init" and not (state / "coordinator.sqlite3").exists()
+                and ((root / MANIFEST).exists() or (state / "client").exists())):
+            raise ProductError(3, "authority_missing", "The established authority is missing. Preserve private state and restore a verified authority backup; setup will not recreate accepted history.")
         # Existing authority/history must match before restoring any missing
         # private credential or connection file on a retry.
         if args.command == "init" and (state / "coordinator.sqlite3").exists():
@@ -632,7 +647,7 @@ Provider: {metadata['provider']}. Verify actual account/client/OS support and sh
 Use my own unique actor and a private membership token issued for me through an approved separate channel.
 Do not copy the sender's identity or paths. Discover my selected project folder and local non-synced private state directory.
 Verify the package's external SHA-256 before execution. Install compatible Python only within setup authorization.
-Run attach with expected project ID, verified coordinator endpoint and my private token file. Never initialize an existing team project.
+Run setup with expected project ID, verified coordinator endpoint and my private token file. Reuse my saved local state on subsequent runs. Never initialize an existing team project.
 Verify receipt against the expected/current accepted revision. Inspect conflicts and preserve offline drafts; no silent history repair.
 Do not migrate a live Vault, change permissions, send invitations or publish without the required authorization.
 Report local receipt, coordinator membership, provider delivery and unavailable mixed-device checks separately.

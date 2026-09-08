@@ -1,6 +1,41 @@
 # Validation record
 
-## Unreleased migration-preparation correction, 2026-09-08
+## Normal 0.2.0 release validation, 2026-09-08
+
+The normal release replaces mandatory alpha onboarding with `setup PROJECT` and a
+three-step agent prompt. Local setup, owner-issued HTTPS membership and provider
+delivery are separately reported. Publishing this version does not complete all
+retained V1 requirements.
+
+Nineteen packaged onboarding cases passed on Python 3.12 and 3.13 without skips.
+They cover default private state, selected-subfolder byte preservation, repeated
+setup retaining identity/history, recovery after actual subprocess exit, restoring
+generated files from the original intent, schema-2 configuration preservation,
+own-member joining, explicit conflict refusal and actionable partial receipts.
+The missing-established-authority regression refuses recreation of revision zero.
+Private credential/runtime files are excluded from new imports and untracked client
+scans; this does not silently rewrite already accepted history.
+
+Independent packaged probes found and verified corrections for `.env`, agent
+history, hidden Markdown, member tokens, connection settings and virtual-environment
+symlinks. Original private bytes remain untouched and absent from generated authority,
+setup snapshots, drafts and backups. This name-based exclusion is not a general
+secret detector for arbitrary user-authored notes.
+
+The integrated macOS Python 3.13 run collected 387 tests: 367 passed and twenty
+platform-specific cases skipped. An earlier run retained an obsolete expectation
+that credentials were imported; that fixture now verifies the intended exclusion.
+Cross-platform CI executes the frozen source separately before release publication.
+
+The release includes the versioned `rehearse_team.py` path: normal owner setup,
+missing-connection recovery, actual verified loopback TLS, a separately issued
+member joining with `setup`, accepted revision receipt and handoff, and preservation
+of offline recipient edits on rerun. Exact final-package and cross-platform results
+belong to that source revision's CI and release notes. Synthetic recipients do not
+establish independent-person onboarding, installation on a Python-free physical
+device, live provider delivery or sustained hosting.
+
+## Migration-preparation correction, 2026-09-08
 
 The published alpha.1 assets remain immutable at c1eb231. Running that baseline
 against an isolated fixture reproduced a false unresolved alias and missing
@@ -22,10 +57,12 @@ changed note bytes and arriving attachments. The private-reference case also
 requires credential directories and notes to be pruned before traversal/reading.
 Local package execution verified the new diagnostics inside a selected-subfolder
 fixture while preserving all existing bytes. No live vault or backup drive was used.
-Cross-platform results for this unreleased correction must be read from its own
-CI run; the alpha's passing CI does not validate these later changes.
+The correction at `0294259` passed [all fourteen CI jobs](https://github.com/Kian-hdr/shared-memory/actions/runs/34264997523).
+Each product job collected 366 cases: Windows 362 passed/four skipped, macOS
+346/twenty, Ubuntu 344/twenty-two, on Python 3.11 and 3.13. All five added regressions
+ran on every product job. These results validate that correction, not later changes.
 
-## Current release scope, 2026-09-08
+## Historical alpha release scope, 2026-09-08
 
 The public `v0.2.0-alpha.1` candidate is an experimental release. Publication no
 longer waits for every stable-V1 gate; all TEAM/COORD/GRAPH requirements remain
