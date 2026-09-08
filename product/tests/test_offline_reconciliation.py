@@ -84,9 +84,9 @@ class OfflineReconciliationTests(unittest.TestCase):
         self.assertEqual(receipt['readiness'], 'ready')
         self.assertEqual(receipt['revision'], expected['revision'])
         self.assertEqual(receipt['files_hash'], expected['files_hash'])
-        actual = {p.relative_to(project).as_posix(): p.read_text(encoding='utf-8')
+        actual = {p.relative_to(project).as_posix(): p.read_bytes()
                   for p in project.rglob('*') if p.is_file()}
-        self.assertEqual(actual, expected['files'])
+        self.assertEqual(actual, {name: text.encode('utf-8') for name, text in expected['files'].items()})
 
     def test_distinct_members_offline_original_base_rebases_after_independent_accepted_change(self):
         offline, project, state, transport = self.make_client('contributor', self.contributor_token)
@@ -95,7 +95,7 @@ class OfflineReconciliationTests(unittest.TestCase):
         self.claim('owner-b', 'Notes/b.md')
         original = self.call('snapshot')
         transport.online = False
-        (project / 'Notes/a.md').write_text('OFFLINE-CONTRIBUTOR-A\n')
+        (project / 'Notes/a.md').write_bytes('OFFLINE-CONTRIBUTOR-A\n'.encode('utf-8'))
         proposal = offline.draft('offline-a', 'contributor-a', 'Offline contributor compared A with original accepted base')
         self.assertEqual(proposal['base_revision'], original['revision'])
         saved_bytes = self.saved(state, 'offline-a').read_bytes()
@@ -103,7 +103,7 @@ class OfflineReconciliationTests(unittest.TestCase):
             offline.submit('offline-a')
         self.assertEqual(self.call('snapshot'), original)
 
-        (online_project / 'Notes/b.md').write_text('ONLINE-OWNER-B\n')
+        (online_project / 'Notes/b.md').write_bytes('ONLINE-OWNER-B\n'.encode('utf-8'))
         online.draft('online-b', 'owner-b', 'Owner verified independent B change')
         online.submit('online-b'); self.accept('online-b')
         advanced = self.call('snapshot')
@@ -111,7 +111,7 @@ class OfflineReconciliationTests(unittest.TestCase):
         self.assertEqual(advanced['files'], {**self.initial, 'Notes/b.md': 'ONLINE-OWNER-B\n'})
         with self.assertRaises((ProductError, ConnectionError)):
             offline.refresh()
-        self.assertEqual((project / 'Notes/a.md').read_text(), 'OFFLINE-CONTRIBUTOR-A\n')
+        self.assertEqual((project / 'Notes/a.md').read_bytes(), 'OFFLINE-CONTRIBUTOR-A\n'.encode('utf-8'))
         self.assertEqual(self.saved(state, 'offline-a').read_bytes(), saved_bytes)
 
         # Restart and refresh before submitting: queued proposal keeps ORIGINAL
@@ -151,10 +151,10 @@ class OfflineReconciliationTests(unittest.TestCase):
         self.claim('owner-a', 'Notes/a.md')
         original = self.call('snapshot')
         transport.online = False
-        (project / 'Notes/a.md').write_text(offline_text)
+        (project / 'Notes/a.md').write_bytes(offline_text.encode('utf-8'))
         offline.draft('queued-a', 'owner-a', 'Saved original owner draft while this local client was offline')
         immutable = self.saved(state, 'queued-a').read_bytes()
-        (online_project / 'Notes/a.md').write_text(online_text)
+        (online_project / 'Notes/a.md').write_bytes(online_text.encode('utf-8'))
         online.draft('accepted-a', 'owner-a', 'Owner reviewed alternate local-client proposal')
         online.submit('accepted-a'); self.accept('accepted-a')
         advanced = self.call('snapshot')
@@ -163,7 +163,7 @@ class OfflineReconciliationTests(unittest.TestCase):
         with self.assertRaises((ProductError, ConnectionError)):
             offline.submit('queued-a')
         self.assertEqual(self.saved(state, 'queued-a').read_bytes(), immutable)
-        self.assertEqual((project / 'Notes/a.md').read_text(), offline_text)
+        self.assertEqual((project / 'Notes/a.md').read_bytes(), offline_text.encode('utf-8'))
         transport.online = True
         offline = Client(project, state, transport)
         self.assert_materialized(offline, project, advanced)
@@ -198,6 +198,51 @@ class OfflineReconciliationTests(unittest.TestCase):
         self.assertEqual(self.call('snapshot', {'revision': original['revision']}), original)
         self.assert_materialized(offline, project, advanced)
         self.assertEqual(self.saved(state, 'queued-a').read_bytes(), immutable)
+
+    def test_crlf_and_mixed_line_endings_survive_offline_draft_acceptance_and_materialization(self):
+        offline, project, state, transport = self.make_client('contributor-line-endings', self.contributor_token)
+        recipient, recipient_project, _, _ = self.make_client('owner-line-endings', self.owner_token)
+        self.claim('preserve-line-endings', 'Notes/', self.contributor_token)
+        original = self.call('snapshot')
+        # Explicit bytes avoid Windows text-mode newline conversion. Both CRLF
+        # and mixed LF/CRLF/lone-CR content, UTF8 and missing final newline matter.
+        payloads = {
+            'Notes/a.md': 'CRLF first\r\nCRLF second\r\n'.encode('utf-8'),
+            'Notes/b.md': 'LF α\nCRLF β\r\nCR γ\rno final newline'.encode('utf-8'),
+        }
+        transport.online = False
+        for name, content in payloads.items():
+            (project / name).write_bytes(content)
+        proposal = offline.draft('exact-line-endings', 'preserve-line-endings',
+                                 'Reviewed exact UTF8 bytes without newline normalization')
+        self.assertEqual(proposal['base_revision'], original['revision'])
+        self.assertEqual({name: text.encode('utf-8') for name, text in proposal['changes'].items()}, payloads)
+        saved = self.saved(state, 'exact-line-endings')
+        immutable = saved.read_bytes()
+        persisted = json.loads(immutable)
+        self.assertEqual({name: text.encode('utf-8') for name, text in persisted['changes'].items()}, payloads)
+        with self.assertRaises((ProductError, ConnectionError)):
+            offline.submit('exact-line-endings')
+        for name, content in payloads.items():
+            self.assertEqual((project / name).read_bytes(), content)
+
+        # Restart and refresh restore accepted context, while original draft
+        # bytes stay queued for an explicit submission and owner acceptance.
+        offline = Client(project, state, transport)
+        transport.online = True
+        self.assert_materialized(offline, project, original)
+        self.assertEqual(saved.read_bytes(), immutable)
+        offline.submit('exact-line-endings')
+        stored = self.call('proposal', {'proposal_id': 'exact-line-endings'})
+        self.assertEqual({name: text.encode('utf-8') for name, text in stored['changes'].items()}, payloads)
+        self.assertTrue(self.accept('exact-line-endings')['accepted'])
+        accepted = self.call('snapshot')
+        self.assertEqual(accepted['revision'], original['revision'] + 1)
+        self.assertEqual({name: text.encode('utf-8') for name, text in accepted['files'].items()}, payloads)
+        self.assert_materialized(offline, project, accepted)
+        self.assert_materialized(recipient, recipient_project, accepted)
+        self.assertEqual(saved.read_bytes(), immutable)
+        self.assertEqual(self.call('snapshot', {'revision': original['revision']}), original)
 
     def test_same_owner_offline_identical_proposal_deduplicates_without_another_revision(self):
         text = 'IDENTICAL-OWNER-CONTENT\n'
