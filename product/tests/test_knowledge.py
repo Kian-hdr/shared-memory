@@ -160,18 +160,49 @@ class KnowledgeTests(unittest.TestCase):
                          ['missing', 'missing', 'outside_scope', 'excluded', 'nonportable_match'])
         self.assertNotIn('PRIVATE-SENTINEL', json.dumps(graph))
 
-    def test_alias_candidates_are_explicit_not_false_obsidian_resolutions(self):
+    def test_exact_aliases_resolve_with_backlinks_and_explicit_native_portability_notice(self):
         files = {'Home.md': '[[AI]] [[Common]] [[Canonical|AI]]',
                  'Canonical.md': '---\naliases:\n - AI\n - Common\n---\n# Canonical',
                  'Second.md': '---\naliases: [Common, "Second, alias"]\n---\n# Second'}
         graph = analyze(files=files)
         links = [e for e in graph['edges'] if e['source'] == 'Home.md']
-        self.assertEqual(links[0]['status'], 'alias_only')
-        self.assertEqual(links[0]['candidates'], ['Canonical.md'])
+        self.assertEqual(links[0]['status'], 'resolved')
+        self.assertEqual(links[0]['target'], 'Canonical.md')
+        self.assertEqual(links[0]['resolution'], 'alias')
         self.assertEqual(links[1]['status'], 'ambiguous')
         self.assertEqual(links[1]['candidates'], ['Canonical.md', 'Second.md'])
         self.assertEqual(links[2]['target'], 'Canonical.md')
         self.assertIn('Second, alias', nodes(graph)['Second.md']['aliases'])
+        self.assertEqual(len(nodes(graph)['Canonical.md']['backlinks']), 2)
+        self.assertTrue(any(d['code'] == 'alias_requires_canonical_link' for d in graph['diagnostics']))
+        self.assertEqual(graph['evidence']['obsidian_ui'], 'not_run')
+
+    def test_alias_anchors_embeds_and_metadata_resolve_without_case_or_unicode_guessing(self):
+        files = {'Home.md': '---\nrelated: "[[AI#Plan]]"\n---\n'
+                 '![[AI#^proof]] [[AI#Missing]] [[ai]] [[Cafe\u0301]] [[Café]] [AI](AI) [[Hidden label]]',
+                 'Canonical.md': '---\naliases: [AI, AI, Café]\n---\n# Plan\nProof ^proof\n',
+                 'credentials/Hidden.md': '---\naliases: [Hidden label]\n---\n# Private'}
+        graph = analyze(files=files)
+        links = [e for e in graph['edges'] if e['source'] == 'Home.md']
+        self.assertEqual([e['status'] for e in links],
+                         ['resolved', 'resolved', 'resolved', 'nonportable_match',
+                          'nonportable_match', 'resolved', 'missing', 'missing'])
+        self.assertEqual([e['anchor_status'] for e in links[:3]], ['resolved', 'resolved', 'missing'])
+        self.assertTrue(links[1]['embed'])
+        self.assertEqual(links[0]['metadata_field'], 'related')
+        self.assertEqual(len(nodes(graph)['Canonical.md']['backlinks']), 4)
+        self.assertNotIn('credentials/Hidden.md', nodes(graph))
+
+    def test_canonical_paths_and_basenames_take_precedence_over_alias_fallback(self):
+        graph = analyze(files={'Home.md': '[[AI]] [[Nick]] [[Shared]] [[Missing/AI]]',
+            'AI.md': '# Real path', 'Folder/Nick.md': '# Real basename',
+            'A.md': '---\naliases: [AI, Nick, Shared]\n---\n# A',
+            'B.md': '---\naliases: [Shared]\n---\n# B'})
+        links = graph['edges']
+        self.assertEqual([e['target'] for e in links], ['AI.md', 'Folder/Nick.md', None, None])
+        self.assertEqual(links[2]['candidates'], ['A.md', 'B.md'])
+        self.assertEqual(links[2]['status'], 'ambiguous')
+        self.assertEqual(links[3]['status'], 'missing')
 
     def test_case_and_unicode_collisions_never_choose_nonexact_match(self):
         files = {'Home.md': '[[NOTE]] [[Café]] [[CAFÉ]] [[Note]]',

@@ -1,5 +1,39 @@
 # Validation record
 
+## Requirement audit: alias resolution and reassignment inbox, 2026-09-08
+
+The post-3121f47 audit found two gaps in the accepted GRAPH-01 and COORD-07 gates.
+A unique frontmatter alias returned a candidate without a target, anchor validation
+or backlink. Expired-lease acquisition by a different actor fenced the old worker
+correctly but omitted that worker from the targeted ownership-change notice.
+Both gaps were reproduced before correction; green historical checks did not
+establish these missing cases.
+
+Product graph lookup now resolves unique exact aliases after canonical paths and
+basenames, retains ambiguity and case/Unicode diagnostics, and validates anchors
+and backlinks. A portability notice requires canonical destinations for native
+Obsidian links. Scoped rename canonicalizes affected alias references while
+preserving explicit display labels, metadata, embeds, anchors and recovery originals.
+Independent probes verified that a new filename cannot silently redirect an
+unrelated alias link. This does not claim native bare-alias compatibility.
+
+Lease reassignment captures the prior worker before replacing the owner and sends
+one transactional notice to each distinct old/new/integration actor. Controlled
+tests reproduce a stopped prior worker resuming its persisted cursor, exactly one
+relevant notice, unrelated-actor isolation, rollback if notification fails,
+idempotent retry and unchanged stale-proposal fencing. All 68 focused coordination,
+CLI and migration tests passed on each local Python 3.13 and 3.12 run.
+
+The extended packaged rename rehearsal passed 20 calls/two expected refusals on
+both local runtimes using a labeled development package. Its bare alias resolves
+the expected note/heading/backlink before rename and becomes a canonical link with
+the original alias label afterwards; all private sentinel bytes and backups remain
+intact. Independent source/test review approved both corrections. The final combined local
+Python 3.13 run collected **351 tests: 331 passed and 20 Windows-only cases skipped**,
+in 82.127 seconds, including the additional alias-collision refusal regression.
+Exact committed package and cross-OS checks are recorded separately when complete; provider,
+independent-person and operational deployment acceptance remain open.
+
 ## Repository separation
 
 Shared Memory now has an independent private development repository. Public

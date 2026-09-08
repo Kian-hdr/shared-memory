@@ -68,6 +68,44 @@ class RenameTests(unittest.TestCase):
             'Notes/b.md': '# Other\n', 'Notes/a.md': None})
         self.client.attach(self.project_id)
 
+    def test_alias_links_are_canonicalized_with_labels_anchors_metadata_and_originals_preserved(self):
+        self.claim()
+        home = ('---\r\naliases: [Home label]\r\nrelated: "[[AI#Heading]]"\r\n---\r\n'
+                '[[AI#Heading]] [[AI#Heading|Explicit]] ![[AI#^block]]\n')
+        note = '---\r\naliases: [AI]\r\n---\r\n# Heading\r\nText ^block\n[[Home label]]'
+        self.publish('notes', {'Home.md': home, 'Notes/Old.md': note, 'Notes/a.md': None})
+        self.client.attach(self.project_id)
+        outside = fixtures.filesystem(self.vault)
+        plan = rename.plan(self.client, 'Notes/Old.md', 'Archive/New.md')
+        expected_home = home.replace('[[AI#Heading]]', '[[Archive/New.md#Heading|AI]]').replace(
+            '[[AI#Heading|Explicit]]', '[[Archive/New.md#Heading|Explicit]]').replace(
+            '![[AI#^block]]', '![[Archive/New.md#^block|AI]]')
+        expected_note = note.replace('[[Home label]]', '[[Home.md|Home label]]')
+        self.assertEqual(plan['changes']['Home.md'], expected_home)
+        self.assertEqual(plan['changes']['Archive/New.md'], expected_note)
+        self.assertEqual(fixtures.filesystem(self.vault), outside)
+        rename.draft(self.client, plan['plan_id'], 'rename-note', 'work', 'Reviewed canonical alias links')
+        self.accept()
+        self.assertEqual(rename.apply(self.client, plan['plan_id'])['readiness'], 'ready')
+        self.assertEqual((self.project / 'Home.md').read_bytes(), expected_home.encode())
+        self.assertEqual((self.project / 'Archive/New.md').read_bytes(), expected_note.encode())
+        self.assertEqual((self.private / 'backups' / rename.digest(home)).read_bytes(), home.encode())
+        self.assertEqual((self.private / 'backups' / rename.digest(note)).read_bytes(), note.encode())
+        graph = rename.knowledge.analyze(root=self.project)
+        self.assertTrue(all(e['status'] == 'resolved' for e in graph['edges']))
+        self.assertFalse(any(d['code'] == 'alias_requires_canonical_link' for d in graph['diagnostics']))
+
+    def test_new_filename_cannot_redirect_an_unrelated_alias_link(self):
+        self.claim()
+        self.publish('notes', {'Home.md': '[[AI]]', 'Notes/Old.md': '# Old',
+                              'Other.md': '---\naliases: [AI]\n---\n# Other', 'Notes/a.md': None})
+        self.client.attach(self.project_id)
+        before = fixtures.filesystem(self.root)
+        with self.assertRaises(ProductError) as caught:
+            rename.plan(self.client, 'Notes/Old.md', 'AI.md')
+        self.assertEqual(caught.exception.code, 'rename_unsupported')
+        self.assertEqual(fixtures.filesystem(self.root), before)
+
     def prepare(self):
         result = rename.plan(self.client, 'Notes/Old.md', 'Archive/New name.md')
         saved = rename.draft(self.client, result['plan_id'], 'rename-note', 'work', 'Reviewed exact rename and backlink diff')

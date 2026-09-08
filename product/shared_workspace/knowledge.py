@@ -714,11 +714,14 @@ class _Graph:
                         result.update(status='nonportable_match', resolution='case_or_unicode', candidates=sorted(candidates))
                         return result
                 if not candidates and syntax == 'wikilink':
-                    aliases = self.alias_fold.get(_fold(destination), [])
-                    if aliases:
-                        result.update(status='alias_only' if len(aliases) == 1 else 'ambiguous',
-                                      resolution='alias', candidates=sorted(aliases))
-                        return result
+                    candidates = self.alias.get(destination, [])
+                    method = 'alias'
+                    if not candidates:
+                        aliases = self.alias_fold.get(_fold(destination), [])
+                        if aliases:
+                            result.update(status='nonportable_match', resolution='case_or_unicode_alias',
+                                          candidates=sorted(aliases))
+                            return result
         if len(candidates) > 1:
             result.update(status='ambiguous', resolution=method, candidates=sorted(candidates))
             return result
@@ -754,7 +757,7 @@ class _Graph:
 
     def finish(self, mode):
         links = self.parse()
-        self.path_fold, self.basename, self.basename_fold, self.alias_fold = (defaultdict(list) for _ in range(4))
+        self.path_fold, self.basename, self.basename_fold, self.alias, self.alias_fold = (defaultdict(list) for _ in range(5))
         for path in sorted(self.inventory):
             self.path_fold[_fold(path)].append(path)
             names = {PurePosixPath(path).name}
@@ -764,6 +767,8 @@ class _Graph:
                 self.basename[name].append(path)
                 self.basename_fold[_fold(name)].append(path)
         for path, node in sorted(self.nodes.items()):
+            for alias in set(node['aliases']):
+                self.alias[alias].append(path)
             for alias in {_fold(a) for a in node['aliases']}:
                 self.alias_fold[alias].append(path)
         for paths in self.path_fold.values():
@@ -785,6 +790,10 @@ class _Graph:
                 self.diagnostic('link_' + resolved['status'], source, line)
             elif resolved['anchor_status'] not in {'resolved', 'not_requested'}:
                 self.diagnostic('anchor_' + resolved['anchor_status'], source, line)
+            if resolved['status'] == 'resolved' and resolved['resolution'] == 'alias':
+                # Product lookup is useful for diagnostics/backlinks, but native
+                # Obsidian inserts a canonical destination plus display label.
+                self.diagnostic('alias_requires_canonical_link', source, line)
             if resolved['target']:
                 target = resolved['target']
                 if target not in self.nodes:
@@ -810,7 +819,8 @@ class _Graph:
                            'candidate_references': MAX_CANDIDATE_REFERENCES, 'graph_bytes': MAX_GRAPH_BYTES},
                 'coverage': {'frontmatter': 'top_level_scalars_and_scalar_lists',
                              'markdown_paths': 'document_relative_then_selected_basename', 'wikilink_paths': 'selected_root_relative',
-                             'aliases': 'candidates_require_canonical_links',
+                             'aliases': 'unique_exact_alias_after_path_and_basename',
+                             'alias_portability': 'use_canonical_destination_with_display_label_for_Obsidian',
                              'unsupported': ['full_yaml', 'html_links', 'Obsidian_query_search_links',
                                              'indented_list_continuations', 'plugin_syntax', 'rendering']}}
         if len(canonical(graph).encode('utf-8')) > MAX_GRAPH_BYTES:

@@ -10,7 +10,7 @@ import os
 import posixpath
 import re
 from pathlib import Path, PurePosixPath
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 
 from . import knowledge
 from .client import Client, _hash, _snapshot, _draft_coordination, _io_errors, _absolute
@@ -174,7 +174,8 @@ def _build(base, source, destination):
     # Diagnostics signal a potentially incomplete graph. External links and
     # excluded/outside links are deliberately retained without following them.
     allowed = {'link_external', 'link_outside_scope', 'link_excluded',
-               'anchor_missing', 'anchor_unsupported', 'anchor_unsupported_attachment_anchor'}
+               'anchor_missing', 'anchor_unsupported', 'anchor_unsupported_attachment_anchor',
+               'alias_requires_canonical_link'}
     for item in graph['diagnostics']:
         if item['code'] not in allowed:
             fail('rename_unsupported', 'Graph requires review before rename: ' + item['code'] + ' at ' + item.get('path', 'selected root'))
@@ -218,6 +219,11 @@ def _build(base, source, destination):
             replacement = quote(posixpath.relpath(target, posixpath.dirname(newsource) or '.'), safe='/.-_~')
         if sep:
             replacement += '#' + fragment
+        if edge['resolution'] == 'alias' and not line[b:].lstrip().startswith('|'):
+            label = unquote(oldpath, errors='strict')
+            if any(c in label for c in '[]|\\\r\n'):
+                fail('rename_unsupported', 'Alias display text cannot be safely preserved in a canonical wikilink.')
+            replacement += '|' + label
         if replacement == original:
             continue
         updates.setdefault((edge['source'], edge['line']), {})[(a, b)] = replacement

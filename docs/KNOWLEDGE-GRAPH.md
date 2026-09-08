@@ -147,10 +147,16 @@ matches without an exact spelling are reported as `nonportable_match`, with
 candidates rather than a silently selected destination. Use consistent casing and
 Unicode NFC names across devices.
 
-An alias is an alternate label, not a reliable replacement for a canonical link
-destination. A bare alias such as `[[Folder boundary]]` can produce `alias_only`;
-use the actual filename and optional display label instead. Obsidian's documented
-alias insertion also uses the canonical filename plus display text. See
+After canonical path and basename lookup, a bare wikilink can resolve through one
+exact frontmatter alias. Its `resolution: alias` target receives ordinary heading/
+block validation and backlinks. Duplicate aliases remain ambiguous; case or Unicode
+normalization alone does not choose an alias. Markdown destinations do not use this
+alias fallback, and private/excluded notes never supply alias candidates.
+
+This is product lookup, not a claim that bare aliases work as native Obsidian links.
+The `alias_requires_canonical_link` diagnostic identifies each resolved alias for
+portable correction, for example `[[Decisions/Folder Boundary.md|Folder boundary]]`.
+Obsidian's documented alias insertion uses the canonical filename plus display text. See
 [Obsidian aliases](https://obsidian.md/help/aliases).
 
 ## Read the result
@@ -167,7 +173,8 @@ provenance where applicable. Repeated links remain separate occurrences.
 | --- | --- |
 | `status: resolved` | A file was found within the selected input |
 | `anchor_status: resolved` | The requested heading or block was also validated |
-| `missing`, `ambiguous`, `alias_only`, `nonportable_match` | Correct or disambiguate the destination; inspect candidates and the source line |
+| `missing`, `ambiguous`, `nonportable_match` | Correct or disambiguate the destination; inspect candidates and the source line |
+| `resolution: alias`, diagnostic `alias_requires_canonical_link` | Product alias lookup found the note; use its canonical destination and alias display text for portable/native links |
 | `outside_scope`, `excluded` | The analyzer deliberately did not enter the parent, private path or excluded input |
 | `external` | An external reference was recognized, without fetching it |
 | `unsupported_reference` | The syntax or reference definition could not be resolved by this parser |
@@ -232,7 +239,12 @@ explicit selected-root paths with ordinary Unicode/spaces; Markdown destinations
 use document-relative URI-encoded paths. Moving a note updates its supported
 outgoing links as well as incoming references. Same-note anchors stay local.
 Uniquely identifiable links in supported top-level frontmatter relation fields
-can be updated; frontmatter aliases remain display metadata. Before/after graph
+can be updated; frontmatter alias declarations remain byte-identical. Affected
+bare alias links become canonical destinations with the alias as display text;
+existing explicit display labels, fragments and embeds remain intact. Unsupported
+alias display delimiters are refused rather than changing the link syntax.
+Unrelated alias references remain precisely flagged for canonical correction.
+Before/after graph
 comparison checks every parsed edge's target, fragment, relation and status.
 
 The command refuses rather than guesses when an affected reference-style link,

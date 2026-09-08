@@ -43,7 +43,7 @@ def rehearse(package, root, project_parent=None):
     project.mkdir(parents=True)
     source, destination = 'Notes/Café.md', 'Archive/世界/Renamed.md'
     home = ('# Shared project\r\n[[Notes/Café#Plan|Friendly label]]\n'
-            '[Markdown](Notes/Caf%C3%A9.md#Plan)\r\n[[Notes/Café#Plan|Project alias]]\n')
+            '[Markdown](Notes/Caf%C3%A9.md#Plan)\r\n[[Project alias#Plan]]\n')
     note = ('---\r\naliases: ["Project alias"]\r\ntype: decision\r\n---\r\n'
             '# Plan\r\nCafé 世界.\n[Evidence](../Evidence.md#Proof)\r\n'
             '[[Evidence#Proof|Evidence]]\n[Self](#Plan)\r\n'
@@ -51,7 +51,8 @@ def rehearse(package, root, project_parent=None):
     evidence = '# Proof\nFixture evidence.\r\n'
     encoded_destination = 'Archive/%E4%B8%96%E7%95%8C/Renamed.md'
     expected_home = home.replace('Notes/Café#', destination + '#').replace(
-        'Notes/Caf%C3%A9.md#', encoded_destination + '#')
+        'Notes/Caf%C3%A9.md#', encoded_destination + '#').replace(
+        '[[Project alias#Plan]]', '[[' + destination + '#Plan|Project alias]]')
     expected_note = note.replace('../Evidence.md#Proof', '../../Evidence.md#Proof').replace(
         '[[Evidence#Proof|Evidence]]', '[[Evidence.md#Proof|Evidence]]')
     originals = {'Home.md': home, source: note, 'Evidence.md': evidence,
@@ -71,7 +72,8 @@ def rehearse(package, root, project_parent=None):
         'package_sha256': sha(package.read_bytes()), 'commands': [], 'checks': {},
         'limitations': ['One synthetic local actor; no independent human or AI-model recipient.',
             'No provider delivery, network service, Obsidian UI, or native rename validation.',
-            'Frontmatter aliases and canonical link display labels are preserved; alias-only references are not resolved.',
+            'The product resolves unique exact frontmatter aliases; renamed links use canonical paths with preserved display labels.',
+            'Product alias resolution does not establish native Obsidian alias-link compatibility.',
             'Only selected-folder backlinks are rewritten. Known outer backlink remains unchanged.',
             'Materialization uses a recoverable journal; multiple filesystem writes are not one atomic rename.',
             'Private credentials, plans and backups remain in this fixture. Only report.json is sanitized.']}
@@ -141,7 +143,19 @@ def rehearse(package, root, project_parent=None):
                    'input_hash': lease['input_hash'], 'policy_revision': policy['policy_revision']}
         baseline = inventory(project)
         before_graph = graph('graph_before')
-        require(not before_graph['diagnostics'], 'unexpected_initial_graph_diagnostics')
+        require(before_graph['diagnostics'] == [
+            {'code': 'alias_requires_canonical_link', 'path': 'Home.md', 'line': 4}],
+            'expected_alias_portability_notice')
+        alias_edges = [edge for edge in before_graph['edges'] if edge['source'] == 'Home.md' and edge['line'] == 4]
+        require(len(alias_edges) == 1, 'one_bare_alias_edge')
+        alias_edge = alias_edges[0]
+        require(alias_edge['target'] == source and alias_edge['status'] == 'resolved'
+                and alias_edge['anchor'] == 'Plan' and alias_edge['anchor_status'] == 'resolved',
+                'bare_alias_target_and_anchor')
+        original_node = next(node for node in before_graph['nodes'] if node['id'] == source)
+        require(original_node['aliases'] == ['Project alias'] and any(
+            backlink['source'] == 'Home.md' and backlink['edge_id'] == alias_edge['id']
+            and backlink['line'] == 4 for backlink in original_node['backlinks']), 'bare_alias_backlink')
         planned = cli('rename_plan', 'graph-rename-plan', '--source', source, '--destination', destination,
                       '--session-token-file', session_token)
         require(inventory(project) == baseline, 'plan_mutated_project')
@@ -199,6 +213,13 @@ def rehearse(package, root, project_parent=None):
                 'unexpected_final_graph_coverage')
         require(all(edge['status'] == 'resolved' and edge['anchor_status'] == 'resolved'
                     for edge in after_graph['edges']), 'unresolved_final_link_or_anchor')
+        canonical_edges = [edge for edge in after_graph['edges'] if edge['source'] == 'Home.md' and edge['line'] == 4]
+        require(len(canonical_edges) == 1 and canonical_edges[0]['target'] == destination,
+                'alias_canonical_destination')
+        moved_node = next(node for node in after_graph['nodes'] if node['id'] == destination)
+        require(moved_node['aliases'] == ['Project alias'] and any(
+            backlink['source'] == 'Home.md' and backlink['edge_id'] == canonical_edges[0]['id']
+            and backlink['line'] == 4 for backlink in moved_node['backlinks']), 'canonical_alias_backlink')
         completed = coord('complete_work', 'complete', {'assignment_id': 'rename-note',
             'revision': receipt['revision'], 'files_hash': receipt['files_hash'],
             'evidence': 'Exact receipts, link anchors and immutable original backups checked', 'coordination': context})
@@ -213,6 +234,7 @@ def rehearse(package, root, project_parent=None):
                             for path, value in sentinels.items()},
             checks={'plan_and_draft_preserve_project': True, 'stale_local_plan_refused': True,
                 'unaccepted_apply_refused': True, 'accepted_source_deleted': True,
+                'bare_alias_target_anchor_backlink_resolved': True, 'alias_canonicalized_with_display_label': True,
                 'destination_and_backlinks_exact': True, 'originals_recoverable_in_private_backups': True,
                 'private_parent_config_runtime_attachment_preserved': True, 'links_and_anchors_resolved': True})
     except Exception:

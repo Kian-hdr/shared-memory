@@ -605,13 +605,19 @@ class Coordination:
                 if any(overlap(a, b) for a in item['targets'] for b in other['targets']):
                     rejected('Targets overlap another live ownership lease.')
         expiry = min(self.now + ttl * 1000, self.session['expires_ms'])
+        prior_actor = item['actor'] if item.get('lease') else None
         item.update(status='active', actor=self.actor, human=self.member['human'], agent=self.member['agent'],
                     person_id=self.session['person_id'], agent_id=self.session['agent_id'],
                     generation=item['generation'] + 1, lease={'session_id': self.session['session_id'], 'expires_ms': expiry},
                     acquire_request_hash=digest(payload))
         self.save_assignment(item)
         self.emit('acquire', item)
-        self.publish_notice(item, 'ownership-acquired', {'generation': item['generation']})
+        # An expired/revoked lease holder may be offline. Retain their recipient
+        # before overwriting ownership so their persisted inbox can catch up.
+        recipients = [item['actor'], item['integration_owner']]
+        if prior_actor is not None:
+            recipients.append(prior_actor)
+        self.notify(recipients, 'ownership-acquired', item['assignment_id'], {'generation': item['generation']})
         return item
 
     def lease_live(self, lease):

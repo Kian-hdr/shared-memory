@@ -62,6 +62,11 @@ def consume_inbox_page(database, token, checkpoint_path, results):
         results.put({'unexpected': type(exc).__name__, 'message': str(exc)})
 
 
+def consume_inbox_at_time(database, token, checkpoint_path, results, now_ms):
+    with patch.object(coordination.time, 'time_ns', return_value=now_ms * 1000000):
+        consume_inbox_page(database, token, checkpoint_path, results)
+
+
 def interrupted_accept(database, token, payload, boundary, ready, wait):
     authority = Coordinator(database)
     if boundary == 'before_commit':
@@ -530,6 +535,90 @@ class CoordinationTests(unittest.TestCase):
         self.assertEqual(winner['lease']['session_id'], 'replacement')
         with patch.object(coordination.time, 'time_ns', return_value=now_ms * 1000000):
             self.reject_unchanged('accept', self.accept_payload('work'))
+
+    def test_different_actor_expiry_reassignment_notifies_prior_worker_after_consumer_restart(self):
+        for actor in ('replacement', 'unrelated'):
+            token = secrets.token_urlsafe(32)
+            self.call('member', {'actor': actor, 'human': actor, 'agent': 'Fixture', 'role': 'contributor', 'token': token}, root=True)
+            self.call('member-binding', {'actor': actor, 'person_id': actor + '-person', 'agent_id': actor + '-agent'}, root=True)
+            self.open_session(actor + '-run', token, 'contributor')
+        self.plan('work')
+        original = self.acquire('work')
+        proposal = self.propose_payload('work')
+        self.call('propose', proposal, session='worker-run')
+        old_context = proposal['coordination']
+        checkpoint = self.root / 'prior-worker-inbox.json'
+        process_context = multiprocessing.get_context('spawn')
+
+        def consume(now_ms=None):
+            results = process_context.Queue()
+            args = (str(self.database), self.tokens['worker-run'], str(checkpoint), results)
+            process = process_context.Process(target=consume_inbox_at_time if now_ms is not None else consume_inbox_page,
+                args=(*args, now_ms) if now_ms is not None else args)
+            process.start()
+            try:
+                result = results.get(timeout=15)
+                process.join(timeout=15)
+                self.assertEqual(process.exitcode, 0)
+                self.assertNotIn('unexpected', result, result)
+                return result
+            finally:
+                if process.is_alive():
+                    process.terminate(); process.join(timeout=5)
+                results.close(); results.join_thread()
+
+        initial = consume()
+        self.assertEqual(len(initial['ids']), 2)
+        self.assertFalse(initial['has_more'])
+        saved_before = json.loads(checkpoint.read_text())
+        self.engine = Coordinator(self.database)  # Consumer and authority reopen independently.
+        now_ms = original['lease']['expires_ms'] + 1
+        with patch.object(coordination.time, 'time_ns', return_value=now_ms * 1000000):
+            acquisition = self.acquire_payload('work')
+            unrelated_before = self.call('inbox', session='unrelated-run')
+            before = self.checkpoint()
+            with patch.object(coordination.Coordination, 'notify', side_effect=OSError('Injected notice persistence failure')):
+                with self.assertRaises(ProductError):
+                    self.call('acquire', acquisition, session='replacement-run')
+            self.assertEqual(self.checkpoint(), before)
+            replacement = self.call('acquire', acquisition, session='replacement-run')
+            self.assertEqual(replacement['actor'], 'replacement')
+            self.assertGreater(replacement['generation'], original['generation'])
+            before_retry = self.checkpoint()
+            self.assertEqual(self.call('acquire', acquisition, session='replacement-run'), replacement)
+            self.assertEqual(self.checkpoint(), before_retry)
+            expected = self.call('inbox', {'after_seq': saved_before['cursor']}, session='worker-run')['messages']
+            self.assertEqual(len(expected), 1, 'Prior worker must receive exactly one reassignment notice')
+            self.assertEqual(expected[0]['kind'], 'ownership-acquired')
+            self.assertEqual(expected[0]['data']['generation'], replacement['generation'])
+            for session in ('owner-run', 'replacement-run'):
+                notices = self.call('inbox', session=session)['messages']
+                self.assertEqual(sum(m['kind'] == 'ownership-acquired' and
+                    m['data']['generation'] == replacement['generation'] for m in notices), 1)
+            self.assertEqual(self.call('inbox', session='unrelated-run'), unrelated_before)
+            self.reject_unchanged('propose', dict(self.propose_payload('work', 'stale'), coordination=old_context), session='worker-run')
+            self.reject_unchanged('accept', self.accept_payload('work'))
+            self.assertEqual(self.call('proposal', {'proposal_id': 'proposal'}, root=True)['coordination'], old_context)
+        resumed = consume(now_ms)
+        self.assertEqual(resumed['ids'], [expected[0]['message_id']])
+        self.assertEqual(json.loads(checkpoint.read_text())['message_ids'], saved_before['message_ids'] + resumed['ids'])
+        self.assertEqual(consume(now_ms)['ids'], [])
+
+    def test_same_actor_reacquire_deduplicates_former_current_and_integrator_notice(self):
+        self.plan('work', integration='worker')
+        original = self.acquire('work')
+        self.open_session('replacement-run', self.worker_token, 'contributor')
+        now_ms = original['lease']['expires_ms'] + 1
+        with patch.object(coordination.time, 'time_ns', return_value=now_ms * 1000000):
+            before = self.call('inbox', session='worker-run')['messages']
+            acquisition = self.acquire_payload('work')
+            result = self.call('acquire', acquisition, session='replacement-run')
+            after = self.call('inbox', session='replacement-run')['messages']
+            self.assertEqual(len(after), len(before) + 1)
+            self.assertEqual(after[-1]['data']['generation'], result['generation'])
+            before_retry = self.checkpoint()
+            self.assertEqual(self.call('acquire', acquisition, session='replacement-run'), result)
+            self.assertEqual(self.checkpoint(), before_retry)
 
     def test_defect_replan_replacement_output_resolves_without_rewriting_contract_history(self):
         self.plan('producer'); self.acquire('producer')
