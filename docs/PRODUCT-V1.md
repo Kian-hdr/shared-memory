@@ -5,8 +5,9 @@
 Product **0.2.0 development** contains the authoritative engine and local client.
 Obsidian is optional. This is not a completed stable V1 release: actual cloud-provider
 receipt, independent recipient onboarding and mixed-OS TEAM-11 remain unverified.
-The existing repository URL and executable identifiers stay unchanged until the
-reviewed launch rebrand. Toolkit 1.3.0 and historical CLI 0.1.0 are separate versions.
+The product source is [Kian-hdr/shared-memory](https://github.com/Kian-hdr/shared-memory).
+Executable/protocol identifiers retain compatibility. Toolkit 1.3.0 and historical
+CLI 0.1.0 are separate versions.
 
 ## What is installed and shared
 
@@ -45,7 +46,8 @@ permission changes remain their own gates.
 
 Obtain a specific reviewed package and its expected SHA-256 from the approved
 source. A package's self-reported hashes do not authenticate its publisher. This
-development source is published on the development branch; public main remains the historical toolkit and must not be substituted silently.
+development source lives in this independent repository. Select its exact reviewed
+revision and package; do not substitute the separate historical toolkit.
 
 Verify the downloaded bytes without executing the package. Compare against the
 external SHA-256 supplied through the approved source; stop on a mismatch:

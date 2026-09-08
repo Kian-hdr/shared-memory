@@ -2,29 +2,28 @@
 
 **A shared workspace for your team and its AI agents.**
 
-The product name is Shared Memory. Obsidian is optional. Existing repository,
-setup URLs, package filenames and protocol identifiers remain unchanged. The
+The product name is Shared Memory. Obsidian is optional. The product repository is
+[Kian-hdr/shared-memory](https://github.com/Kian-hdr/shared-memory); package filenames
+and protocol identifiers retain compatibility. The
 name is a product decision; trademark and domain clearance are unverified.
 
-## Repository rebrand at first-version launch
+## Independent product repository, 2026-09-08
 
-This is a deferred launch requirement. Preserve the current GitHub URL during
-development; do not rename or publish merely because the product name is chosen.
-The exact repository slug still needs selection and availability checks.
+Kian selected a separate repository for Shared Memory because its scope has grown
+beyond the original Obsidian workspace toolkit. This supersedes the earlier plan
+to rename the toolkit repository at first-version launch. The product uses
+`Kian-hdr/shared-memory`; the original repository remains the legacy toolkit record
+and is being made private. The new product repository also remains private during
+development and becomes public only when version 1 is finished, as Kian specified.
+Source history and attribution are preserved.
 
-Before an authorized first-version launch:
-
-- Select and verify the repository slug for Shared Memory.
-- Prepare the repository rename and rewrite its description, README, setup/join
-  prompts, release documentation and examples consistently with the product name
-  and tagline: “A shared workspace for your team and its AI agents.”
-- Inventory existing setup links, badges, release/download links and pitch QR
-  destinations. Test intended updates and actual redirect behavior before switching;
-  do not assume every old URL or downstream integration will continue working.
-- Apply the reviewed remote rename/publication only at the existing launch approval
-  gate; then verify the final links, installation/join flow and QR destinations.
-- Retain the accepted readiness, provider and mixed-OS release gates. Naming alone
-  does not establish product readiness or trademark/domain clearance.
+Current setup, clone and download navigation point to the product repository.
+Historical CI links in the validation record retain their original provenance and
+may require access to the private legacy repository. New CI and release evidence
+must come from this repository. Existing installed packages and published pitch/QR
+links need explicit review before replacement; a new repository creates no redirect
+from the old URL. Repository separation does not establish stable V1, provider
+support, trademark/domain clearance or readiness to migrate a live vault.
 
 ## Accepted product direction
 
@@ -294,8 +293,8 @@ evidence for this profile, not a production capacity, latency SLA or cloud resul
 
 Remaining release evidence: clean independent recipient setup, a reachable reviewed coordinator deployment, real provider/account
 delivery and offline recovery, and all three OS clients on the same project under
-TEAM-11. Public upload/rename/deployment and real provider permission changes keep
-their existing gates. Live Vault migration remains gated on validated readiness and
+TEAM-11. Repository separation is authorized. Public visibility must wait for completed
+version 1; deployment and provider readiness remain separate requirements. Live Vault migration remains gated on validated readiness and
 the owner's confirmed backup, second-drive working copy and target.
 
 ## Current decision

@@ -1,6 +1,7 @@
-# Shared Obsidian Vault: Agent Instructions
+# Shared Memory: Agent Instructions
 
-This is a reusable contract for a vault shared by multiple people and AI agents.
+This is a reusable contract for a project folder shared by people and AI agents.
+Obsidian is optional; an existing vault may contain the selected shared folder.
 Preserve existing knowledge, make ownership clear, and leave enough context for
 another contributor to continue. Resolve the user's intended project before setup;
 a downloaded toolkit is not automatically the project to configure.

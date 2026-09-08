@@ -2,9 +2,12 @@
 
 **A shared workspace for your team and its AI agents.**
 
-Shared Memory is the product name. The repository remains
-[`Kian-hdr/shared-obsidian-workspace`](https://github.com/Kian-hdr/shared-obsidian-workspace);
-existing setup links and technical identifiers remain valid.
+Shared Memory is an independent product, developed in
+[`Kian-hdr/shared-memory`](https://github.com/Kian-hdr/shared-memory). The original
+Obsidian workspace toolkit has a separate legacy repository. Development history
+and compatibility code are preserved; this repository is the product source.
+It remains private during development and becomes public only after version 1
+is complete.
 
 An independent coordination product for ordinary project folders and AI agents.
 Readable Markdown holds project knowledge and instructions. The development
@@ -22,25 +25,12 @@ and handoffs. The optional Python tracker adds work records, target claims, depe
 tracking, and an Obsidian Bases dashboard.
 
 Use your own folder, repository, storage provider, and account. Local-only work needs
-no online account. The public GitHub address below is the software source; it does
+no online account. The GitHub address below is the software source; it does
 not connect you to the maintainer's vault or Google Drive.
 
 The legacy tracker uses advisory file claims. The development engine adds
 authoritative proposal acceptance and recoverable file materialization. Neither
 controls external editors or configures a provider’s sharing permissions.
-
-## Try the legacy toolkit's local handoff demo
-
-Run the [two-person demo](docs/DEMO.md) in a disposable plain-folder fixture.
-An optional mode also tests a project within an existing-vault fixture. It uses actual
-tracker commands to demonstrate separate work, a rejected conflicting claim,
-an accepted handoff and verified completion. It uses fictional actors on one
-computer and needs no cloud account. It does not launch independent AI agents.
-
-**Maturity: early toolkit for controlled pilots.** Review the
-[production-readiness roadmap](docs/READINESS.md) before adopting it for critical
-or large-scale work. Published 1.2.0 has known drift-detection gaps; the local
-1.3.0 candidate adds fixes and a reproducible demo pending publication.
 
 ## Authoritative product development build
 
@@ -50,11 +40,12 @@ revision acceptance, preserved conflicts/offline drafts, recoverable file update
 owner/recipient setup and verified package installation/rollback. It requires Python
 3.11+. Obsidian remains optional.
 
-Local tests and a packaged TLS rehearsal do not establish cloud-provider delivery,
-real recipient onboarding or mixed-OS TEAM-11. Stable V1 is not complete. The
-[readiness roadmap](docs/READINESS.md) retains those gates and the deferred GitHub
-launch rename. The historical advisory toolkit and 0.1.0 preview remain documented
-separately; the [published development branch](https://github.com/Kian-hdr/shared-obsidian-workspace/tree/shared-memory-0.2.0-development) contains the candidate source, while public main remains the historical toolkit.
+This is an experimental development build. Existing automated tests and HTTPS
+rehearsals are recorded in [validation](VALIDATION.md); real provider delivery,
+independent recipient onboarding and complete TEAM-11 remain open. Stable V1 is
+not complete. The [readiness roadmap](docs/READINESS.md) retains those requirements.
+The historical advisory toolkit and 0.1.0 preview remain compatibility components;
+`main` in this repository tracks Shared Memory development.
 
 ## Let your agent set it up
 
@@ -67,18 +58,31 @@ is only included when you request it.
 
 ## Get it
 
-- [Download the repository ZIP](https://github.com/Kian-hdr/shared-obsidian-workspace/archive/refs/heads/main.zip).
+- [Download the repository ZIP](https://github.com/Kian-hdr/shared-memory/archive/refs/heads/main.zip).
 - [Open the copyable AGENTS.md](AGENTS.md).
 - [Open the complete skill folder](skills/setup-shared-project-workspace).
 
 Or clone it outside your synchronized vault:
 
 ```bash
-git clone https://github.com/Kian-hdr/shared-obsidian-workspace.git
-cd shared-obsidian-workspace
+git clone https://github.com/Kian-hdr/shared-memory.git
+cd shared-memory
 ```
 
 ## Legacy toolkit options
+
+### Legacy toolkit local handoff demo
+
+Run the [two-person demo](docs/DEMO.md) in a disposable plain-folder fixture.
+An optional mode also tests a project within an existing-vault fixture. It uses actual
+tracker commands to demonstrate separate work, a rejected conflicting claim,
+an accepted handoff and verified completion. It uses fictional actors on one
+computer and needs no cloud account. It does not launch independent AI agents.
+
+**Maturity: early toolkit for controlled pilots.** Review the
+[production-readiness roadmap](docs/READINESS.md) before adopting it for critical
+or large-scale work. The historical 1.2.0 toolkit has known drift-detection gaps;
+the bundled 1.3.0 compatibility code includes later fixes and a reproducible demo.
 
 For the authoritative runtime, follow [the product guide](docs/PRODUCT-V1.md)
 using an explicitly reviewed `.pyz` and its external SHA-256. The options below

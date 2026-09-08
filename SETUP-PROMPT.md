@@ -4,14 +4,14 @@
 
 Copy this into a capable agent running on or connected to your computer. It will
 find the actual project and reviewed package, and ask only for missing inputs.
-The development branch contains the current candidate; main remains the historical
-toolkit. Select a reviewed immutable revision and package. No stable release or
+This independent repository contains the Shared Memory development candidate.
+Select a reviewed immutable revision and package. No stable release or
 team readiness is implied by this prompt.
 
 ```text
 Set up Shared Memory for my selected project folder, or join the existing project
 whose owner supplied my setup instructions. Product source:
-https://github.com/Kian-hdr/shared-obsidian-workspace/tree/shared-memory-0.2.0-development
+https://github.com/Kian-hdr/shared-memory
 
 Carry out routine authorized local setup and verification. Discover my actual OS,
 compatible Python, selected folder, create/join intent and storage method. A shared

@@ -1,5 +1,15 @@
 # Validation record
 
+## Repository separation
+
+Shared Memory now has an independent private development repository. Public
+visibility is deferred until version 1 is finished. The source was transferred
+from commit `c4aaedbbeb959bce8b624efe2c83c91f96c8ee0d` with its history preserved.
+The separation changes repository navigation and documentation, not runtime behavior.
+Historical links below identify runs in the legacy repository and may require access
+after it becomes private. They are not new-repository CI results. Fresh product
+repository CI and package/release verification remain required.
+
 ## Windows output correction, 2026-09-08
 
 The corrected recovery source at `8c5c26ef6167dc3efb256ef798fb3744777af044`
@@ -56,14 +66,14 @@ release result.
 ## Published development branch and cross-platform CI, 2026-09-08
 
 The reviewed source is published on
-[`shared-memory-0.2.0-development`](https://github.com/Kian-hdr/shared-obsidian-workspace/tree/shared-memory-0.2.0-development).
+[the preserved source revision](https://github.com/Kian-hdr/shared-memory/tree/c4aaedbbeb959bce8b624efe2c83c91f96c8ee0d).
 This is a development branch, not a stable V1 release or a repository rename.
 
 The [first run](https://github.com/Kian-hdr/shared-obsidian-workspace/actions/runs/34178714443)
 passed ten of twelve jobs. Both Windows product jobs exposed a fixture newline
 mismatch: Windows text-mode writes produced CRLF while the test expected LF.
 The runtime correctly preserved the actual bytes. Commit
-[`9214375`](https://github.com/Kian-hdr/shared-obsidian-workspace/commit/9214375ea778c4c650def5ecb5f253756d218f49)
+[`9214375`](https://github.com/Kian-hdr/shared-memory/commit/9214375ea778c4c650def5ecb5f253756d218f49)
 uses explicit UTF8 fixture bytes and adds a mixed-line-ending roundtrip, bringing
 the product suite to 106 tests. The
 [corrected run](https://github.com/Kian-hdr/shared-obsidian-workspace/actions/runs/34178908410)
@@ -262,7 +272,7 @@ workflow, and authorized local installation still includes missing Obsidian and
 Homebrew when chosen. Skill validation and documentation link, format, YAML, and
 targeted private-reference checks passed.
 
-Consult the [workflow runs](https://github.com/Kian-hdr/shared-obsidian-workspace/actions/workflows/test.yml)
+Consult the [workflow runs](https://github.com/Kian-hdr/shared-memory/actions/workflows/test.yml)
 for Linux, macOS, and Windows results on Python 3.9 and 3.13. A workflow definition
 alone does not establish a passing run.
 
