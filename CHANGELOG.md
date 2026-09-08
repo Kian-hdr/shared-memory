@@ -19,6 +19,8 @@ open in [READINESS.md](docs/READINESS.md).
 - Read-only graph inspection and reviewed selected-folder note renames.
 - Explicit immutable-revision delivery adapter with local rclone fixtures.
   Actual Google Drive account delivery remains unverified.
+- Exact-byte trusted tracker installation across line endings, including Windows,
+  with explicit review required for existing drift.
 - Verified package installation and rollback, owner/join guidance, copyable
   setup prompt, standalone SVG/PNG/macOS icon, and separate legacy skill bundle.
 

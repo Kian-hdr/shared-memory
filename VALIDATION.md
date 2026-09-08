@@ -62,7 +62,8 @@ ignored sentinel exclusion, hidden-change refusal, complete source/provenance/ha
 readback, same-environment repeatability and output preservation. Their completed
 results are recorded with the final release and CI below; no leak was observed.
 
-Final local Python 3.13 validation collected **361 tests: 341 passed and 20
+At pre-Windows-correction candidate `46b6341`, local Python 3.13 validation
+collected **361 tests: 341 passed and 20
 Windows-only cases skipped**, in 91.993 seconds. The five release-build regressions
 also passed on Python 3.12 and 3.13, including eight hidden-index change combinations;
 23 existing packaged CLI tests passed separately. Source packaging, documentation,
@@ -73,6 +74,33 @@ Physical Windows onboarding, independent-human operation, actual cloud-storage
 provider receipt/recovery, long-running hosting and production-scale capacity are
 unverified. Local fixture delivery and coordinator transport are separate claims.
 No live production-vault migration has been performed.
+
+## Alpha candidate Windows correction, 2026-09-08
+
+Candidate `46b6341` is withheld. Its final [CI matrix](https://github.com/Kian-hdr/shared-memory/actions/runs/34261825753)
+exposed a legacy toolkit setup bug on both Windows runtimes: text-mode copying
+changed the trusted LF tracker asset to CRLF, which the strict byte-integrity check
+correctly rejected. Earlier platform-dependent Git checkout endings masked it.
+The source asset now stays bytes through preflight and installation. Existing
+newline-only drift still requires an explicit reviewed managed upgrade; validation
+was not relaxed. New regressions exercise LF, CRLF, mixed endings, Unicode and
+no-final-newline content, exact setup retry and read-only audit. All 58 toolkit
+tests passed locally on Python 3.9 and 3.13; all 23 packaged CLI tests passed on
+3.13. An independent reviewer repeated the three affected tests successfully.
+Fresh Windows CI is required for the corrected release commit.
+
+The same matrix also caught a test-fixture mistake: once its own test file was
+committed, the complete-source archive legitimately contained the hardcoded fake
+secret marker in that test's source. A fresh per-run marker now tests ignored-data
+exclusion without matching the test itself. Recursive archive/byte checks remain
+strict. All five release-builder tests passed after correction, independently
+repeated. This was a false-positive test assertion, not observed credential leakage.
+
+The withheld candidate's separate [schema-2 HTTPS run](https://github.com/Kian-hdr/shared-memory/actions/runs/34261863973)
+passed all four jobs, and its five fault scenarios passed on both the Mac and the
+actual Brev Linux machine. Those successes do not override the Windows setup issue.
+Its private artifacts were retained and were not published. The final prerelease
+must identify the corrected source, new asset hashes and completed new CI runs.
 
 ## Requirement audit: selected import and factual conflict routing, 2026-09-08
 

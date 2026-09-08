@@ -220,6 +220,48 @@ class WorkspaceTests(unittest.TestCase):
         self.run_command([sys.executable, str(SETUP), str(self.root), "--mode", "audit"])
         self.assertEqual(before, snapshot(self.root))
 
+    def test_trusted_tracker_asset_bytes_survive_setup_retry_and_audit(self) -> None:
+        original = (SKILL_ROOT / "assets/project_tracker.py").read_bytes().replace(b"\r\n", b"\n")
+        original += "# Exact UTF8 fixture: café 世界, no final newline".encode("utf-8")
+        for label, expected in (("lf", original), ("crlf", original.replace(b"\n", b"\r\n")),
+                                ("mixed", original.replace(b"\n", b"\r\n", 1))):
+            with self.subTest(source_line_endings=label):
+                skill = Path(self.temporary.name) / ("skill-" + label)
+                shutil.copytree(SKILL_ROOT, skill, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+                asset = skill / "assets/project_tracker.py"
+                asset.write_bytes(expected)
+                target = Path(self.temporary.name) / ("project-" + label)
+                target.mkdir()
+                setup = skill / "scripts/setup_workspace.py"
+                command = [sys.executable, str(setup), str(target), "--purpose", "Exact trusted asset bytes",
+                           "--actor", "fixture-worker", "--initiated-by", "Fixture", "--agent", "Test"]
+                self.run_command(command)
+                installed = target / "Coordination/project_tracker.py"
+                self.assertEqual(installed.read_bytes(), expected)
+                before = snapshot(target)
+                self.run_command(command)
+                self.assertEqual(snapshot(target), before)
+                self.run_command([sys.executable, str(setup), str(target), "--mode", "audit"])
+                self.assertEqual(snapshot(target), before)
+                self.assertEqual(asset.read_bytes(), expected)
+
+    def test_tracker_newline_only_drift_requires_explicit_managed_upgrade(self) -> None:
+        tracker = self.root / "Coordination/project_tracker.py"
+        original = tracker.read_bytes()
+        changed = original.replace(b"\r\n", b"\n") if b"\r\n" in original else original.replace(b"\n", b"\r\n")
+        self.assertNotEqual(changed, original)
+        self.assertEqual(changed.replace(b"\r\n", b"\n"), original.replace(b"\r\n", b"\n"))
+        tracker.write_bytes(changed)
+        before = snapshot(self.root)
+        result = self.setup_project(self.root, expected=1)
+        self.assertIn("Generated file has drifted", result.stderr)
+        self.assertEqual(snapshot(self.root), before)
+        self.setup_project(self.root, ["--upgrade-managed"])
+        self.assertEqual(tracker.read_bytes(), original)
+        before = snapshot(self.root)
+        self.run_command([sys.executable, str(SETUP), str(self.root), "--mode", "audit"])
+        self.assertEqual(snapshot(self.root), before)
+
     def test_unsigned_conflict_stops_before_mutation(self) -> None:
         root = Path(self.temporary.name) / "Conflict"
         (root / "Coordination").mkdir(parents=True)

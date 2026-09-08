@@ -211,17 +211,21 @@ def merge_managed(path: Path, title: str, section: str, *, dry_run: bool) -> str
     return action
 
 
-def install_generated(source: Path, destination: Path, content: str, *, dry_run: bool) -> str:
+def install_generated(source: Path, destination: Path, content: str | bytes, *, dry_run: bool) -> str:
     if destination.exists():
-        existing = destination.read_text(encoding="utf-8", errors="replace")
-        if GENERATED_SIGNATURE not in existing:
+        existing = destination.read_bytes() if isinstance(content, bytes) else destination.read_text(encoding="utf-8", errors="replace")
+        signature = GENERATED_SIGNATURE.encode("utf-8") if isinstance(content, bytes) else GENERATED_SIGNATURE
+        if signature not in existing:
             raise SetupError(f"Refusing to replace unsigned existing file: {destination}")
         action = "unchanged" if existing == content else "updated generated file"
     else:
         action = "created"
     if not dry_run:
         destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_text(content, encoding="utf-8")
+        if isinstance(content, bytes):
+            destination.write_bytes(content)
+        else:
+            destination.write_text(content, encoding="utf-8")
         if source.suffix == ".py":
             destination.chmod(0o755)
     return action
@@ -287,14 +291,16 @@ def main() -> int:
         items = coordination / "Items"
         planned = {
             "Coordination/Workspace.base": dashboard_content(),
-            "Coordination/project_tracker.py": (ASSETS / "project_tracker.py").read_text(encoding="utf-8"),
+            "Coordination/project_tracker.py": (ASSETS / "project_tracker.py").read_bytes(),
         }
 
         for relative in ("Coordination/Workspace.base", "Coordination/project_tracker.py"):
             existing = target / relative
             if existing.exists():
-                content = existing.read_text(encoding="utf-8", errors="replace")
-                if GENERATED_SIGNATURE not in content:
+                expected = planned[relative]
+                content = existing.read_bytes() if isinstance(expected, bytes) else existing.read_text(encoding="utf-8", errors="replace")
+                signature = GENERATED_SIGNATURE.encode("utf-8") if isinstance(expected, bytes) else GENERATED_SIGNATURE
+                if signature not in content:
                     raise SetupError(f"Refusing to replace unsigned existing file: {existing}")
                 if content != planned[relative] and not args.upgrade_managed:
                     raise SetupError(f"Generated file has drifted: {existing}. Review the diff and use --upgrade-managed only when its replacement is authorized.")

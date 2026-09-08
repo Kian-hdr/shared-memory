@@ -6,6 +6,7 @@ import io
 import json
 import os
 from pathlib import Path
+import secrets
 import subprocess
 import sys
 import tempfile
@@ -80,7 +81,9 @@ class ReleaseBuildTests(unittest.TestCase):
                     self.assert_secret_absent(archive.read(name), secret)
 
     def test_ignored_skill_and_runtime_extras_never_enter_any_release_asset(self):
-        secret = b'SYNTHETIC_IGNORED_SECRET_907e2a91'
+        # The complete source kit includes this test itself. A fresh marker
+        # distinguishes ignored fixture data from the test's committed source.
+        secret = ('SYNTHETIC_IGNORED_SECRET_' + secrets.token_hex(16)).encode()
         for name in ('skills/setup-shared-project-workspace/.env',
                      'skills/setup-shared-project-workspace/.DS_Store',
                      'product/shared_workspace/ignored-module.py'):
