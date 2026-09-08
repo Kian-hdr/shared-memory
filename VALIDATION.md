@@ -10,6 +10,32 @@ Historical links below identify runs in the legacy repository and may require ac
 after it becomes private. They are not new-repository CI results. Fresh product
 repository CI and package/release verification remain required.
 
+## Completed c4aaedb cross-platform checkpoint, 2026-09-08
+
+The [twelve-job matrix](https://github.com/Kian-hdr/shared-obsidian-workspace/actions/runs/34180872359)
+and its duplicate PR run both passed at
+`c4aaedbbeb959bce8b624efe2c83c91f96c8ee0d`. The product suite collects 132 cases:
+macOS executes all 132; Windows passes 130 with two explicit skips (POSIX hook
+fixture and unavailable unsupported-Python interpreter); Ubuntu passes 131 with
+one skip (unavailable unsupported-Python interpreter). Both Python 3.11 and 3.13
+jobs passed on each OS; all six legacy toolkit/demo jobs also passed.
+
+The [same-source HTTPS run](https://github.com/Kian-hdr/shared-obsidian-workspace/actions/runs/34180872287)
+passed all four concurrent jobs and 103 packaged CLI calls. All OS actors used
+package SHA-256 `2c7cd1e5b3c11ddd586e24514f9b0f9f6bbfa9ab6657d90e56933e2fa89b33df`,
+reached revision 3 and file hash
+`8d721b8696ffdabe16a392582867e2dc1080131db29acfab8e166d839fd31ff7`,
+and preserved private parent notes, settings and local attachments, including exact
+mixed line endings and non-ASCII accepted text. Handoffs and premature-write
+rejection passed; all task-owned processes stopped. These were synthetic automated
+actors, not independent humans or real storage-provider delivery.
+
+Terminal run metadata, all six product job logs, all four HTTPS reports, the exact
+package and a verified 61-file source snapshot were captured privately before the
+legacy repository became private. Both repositories are now private. No GitHub
+release or public prerelease was created. The new repository retains source history;
+its own validation remains distinct from these historical runs.
+
 ## Windows output correction, 2026-09-08
 
 The corrected recovery source at `8c5c26ef6167dc3efb256ef798fb3744777af044`
@@ -28,8 +54,8 @@ credential value, and still require private credential bytes to remain unchanged
 through interrupted and completed retries.
 
 **132/132 product tests passed on macOS/Python 3.13.15 and 3.12.13, no skips.**
-Fresh actual Windows/macOS/Linux CI and the HTTPS run on this committed output fix
-remain the next release check. The earlier successful run does not substitute for it.
+The completed remote result for the output fix is recorded above. New-repository
+validation remains a separate check after the documentation/navigation transfer.
 
 ## Recovery hardening checkpoint, 2026-09-08
 
