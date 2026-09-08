@@ -120,7 +120,8 @@ and queue proposals, but cannot assert globally accepted ownership or revisions
 until reconciliation. A folder-only shared mode may remain with explicitly weaker
 guarantees. Preserve drafts and both versions through conflicts and recovery.
 
-Google Drive, OneDrive and iCloud are separate planned adapters, each requiring real
+Google Drive has a first explicit immutable-revision rclone adapter with local fixture
+coverage. OneDrive and iCloud adapters remain planned. Each requires real
 provider/device validation. Start with one provider and two people; do not claim
 parity or supported folder placement/access isolation across providers. Use one sync
 provider per physical shared folder. Keep Git repositories/worktrees outside
@@ -143,16 +144,16 @@ primary source. Split rows when account types or policies change capabilities.
 | --- | --- | --- | --- | --- |
 | Local filesystem; no account | Required | Required | Required | The corrected development CI passes on all three OSes; installed/operator behavior and real cross-device delivery remain separate evidence |
 | Self-hosted storage; deployment-specific identity | Required integration path | Required integration path | Required integration path | Authenticated coordinator HTTPS and local folder receipt inspection are implemented and tested locally; an actual storage delivery route and reachable deployment still need selection and real receipt/recovery validation |
-| Google Drive; personal Google account | Vendor desktop route documented; adapter unverified | Vendor desktop route documented; adapter unverified | Drive for desktop unavailable; alternative integration unimplemented/unverified | Check account-specific API/access capabilities and supported route before claiming product support |
-| Google Drive; Workspace / shared drives where applicable | Vendor desktop route documented; account-policy integration unverified | Vendor desktop route documented; account-policy integration unverified | Drive for desktop unavailable; alternative integration unimplemented/unverified | Verify actual Workspace policy, shared-folder/drive access and recipient receipt; no personal-account equivalence assumed |
+| Google Drive; personal Google account | Vendor desktop route documented; adapter unverified | Vendor desktop route documented; adapter unverified | Drive for desktop unavailable; explicit rclone route implemented, live account acceptance unverified | Check account-specific API/access capabilities and supported route before claiming product support |
+| Google Drive; Workspace / shared drives where applicable | Vendor desktop route documented; account-policy integration unverified | Vendor desktop route documented; account-policy integration unverified | Drive for desktop unavailable; explicit rclone route implemented, live account acceptance unverified | Verify actual Workspace policy, shared-folder/drive access and recipient receipt; no personal-account equivalence assumed |
 | OneDrive; personal Microsoft account | Adapter/capabilities unverified | Adapter/capabilities unverified | Adapter/capabilities unverified | Review official account/OS support and test the chosen route; no vendor-client or API parity claimed |
 | OneDrive / SharePoint; work or school account | Adapter/capabilities unverified | Adapter/capabilities unverified | Adapter/capabilities unverified | Verify tenant policies and supported sharing/placement, then receipt and recovery |
 | iCloud Drive; Apple Account and actual sharing arrangement | Adapter/capabilities unverified | Adapter/capabilities unverified | Adapter/capabilities unverified | No iCloud/Linux integration or parity is claimed; establish a supported route or report the combination unsupported |
 
 Google's current requirements explicitly state that Drive for desktop is not
 available on Linux. A browser route is not proof of a local agent integration.
-Linux needs a separately supported and tested route where appropriate; no such
-API adapter has been implemented here. [Google Drive system requirements](https://support.google.com/drive/answer/2375082), checked 2026-09-08.
+The explicit rclone route is separate from that desktop client. Its implementation
+and local fixtures do not yet establish live Google Drive account acceptance. [Google Drive system requirements](https://support.google.com/drive/answer/2375082), checked 2026-09-08.
 
 Google Drive, OneDrive and iCloud remain priority integrations alongside local and
 self-hosted storage. Priority does not imply verified support. Keep one provider
@@ -182,16 +183,18 @@ in the core design and automated tests from the start. Define the API and test a
 with a separate toy model, and do not report skipped/unimplemented tests as passes.
 The 1.3.0 scripted local demo is a useful regression fixture, not this team suite.
 
-**Status, 2026-09-08:** the 0.2.0 development engine/client and packaged CLI now
-have executable local acceptance coverage. The full product suite passed 105 tests
-on macOS/Python 3.13 and 3.12 before publication. The subsequent 106-case
-product suite and toolkit demos passed the twelve-job Windows/macOS/Ubuntu CI
-matrix at commit 9214375, with explicit platform-specific skips in the validation
-record. Actual Uvicorn TLS serving passed a 16-command local rehearsal. A subsequent
-99-command HTTPS run at b58ea16 passed with concurrent macOS, Windows and Linux
-clients on one project, exact shared package/revision/hash, preserved private files
-and accepted handoffs. This is automated hosted-runner evidence. Independent live
-recipients, provider delivery and complete TEAM-11 remain unverified. See [validation](../VALIDATION.md).
+**Status, 2026-09-08:** the authoritative engine/client, recovered owner setup,
+packaged CLI and explicit revision delivery now pass **174/174 local product tests**
+on Python 3.13.15 and 3.12.13. Independent review reran the 42 new focused delivery,
+client and packaged command cases. Actual local rclone transfer/retry and rejection
+of missing/corrupt provider fixtures passed without using coordinator bytes as a
+fallback. Initial attachment still uses the coordinator. The preceding 132-case
+three-OS checkpoint and 111-command same-project HTTPS trial passed at 3b648d0;
+changed-source cross-OS validation is tracked separately in GitHub Actions and
+[validation](../VALIDATION.md). Synthetic actors and local fixtures are bounded
+engineering evidence. Real provider accounts, independent recipients and full
+TEAM-11 remain unverified. Both product and legacy repositories are private;
+public V1 requires completion of the retained release gates.
 
 | ID | Scenario and observable acceptance |
 | --- | --- |
@@ -282,8 +285,12 @@ cover supplied structured claims; arbitrary prose remains a human/agent review.
 The product also includes exact-package installation/rollback, consistent database
 backup, read-only migration planning, isolated Git worktrees, accepted-source context
 search, provider capability reporting and local expected-snapshot receipt checks.
-Folder adapters do not configure provider access or transport; deployment, vendor
-API adapters and actual account/client/OS receipt are not established. The legacy
+The original folder checks do not configure provider access or transport. New
+explicit delivery-publish/delivery-fetch commands add an immutable rclone revision
+route with authenticated metadata checks and journaled client application. They
+require an already attached client and private reviewed account configuration.
+Actual Google Drive account/recipient delivery, other provider adapters and a
+persistent reviewed deployment remain open. The legacy
 tracker remains supported separately. See [the operating guide](PRODUCT-V1.md).
 
 An earlier source-versioned 0.2.0 synthetic local profile of 1,000 text notes (~1.13 MB), 10 members and 50 accepted
