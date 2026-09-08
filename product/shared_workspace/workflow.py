@@ -32,6 +32,7 @@ def add_commands(commands):
     init.add_argument("--mode", choices=("local", "team"), default="local")
     init.add_argument("--provider", choices=PROVIDERS, default="local")
     init.add_argument("--include", action="append", help="Explicit relative UTF8 file; default all project Markdown outside protected directories")
+    init.add_argument("--coordination-file", help="Explicit schema 2 person/agent identity and policy JSON; omission preserves schema 1")
     attach = commands.add_parser("attach", help="Attach a recipient to an existing authoritative project")
     attach.add_argument("project")
     attach.add_argument("--state-dir", required=True)
@@ -46,11 +47,13 @@ def add_commands(commands):
         command = commands.add_parser(name)
         command.add_argument("project")
         command.add_argument("--state-dir", required=True)
+        command.add_argument("--session-token-file", help="Private credential for this running session; never substitutes a payload identity")
         if name in {"draft", "promote-draft"}:
             command.add_argument("--proposal-id", required=True)
             command.add_argument("--assignment-id", required=True)
             command.add_argument("--evidence", required=True)
             command.add_argument("--claims-file")
+            command.add_argument("--coordination-file", help="Immutable session/generation/policy/input context recorded with this draft")
             if name == "promote-draft":
                 command.add_argument("--preserved-id", required=True)
         if name == "context":
@@ -173,14 +176,17 @@ def write_manifest(root, project_id, provider):
     return metadata
 
 
-def connect(state):
+def connect(state, token_file=None):
+    if token_file is not None and not str(token_file).strip():
+        raise ProductError(2, "usage_error", "An explicit credential path must not be empty.")
+    credential = state / "member.token" if token_file is None else token_file
     config = json_file(state / "connection.json")
     if not isinstance(config, dict) or config.get("protocol") != 1:
         raise ProductError(3, "connection_invalid", "Unsupported private connection configuration.")
     if config.get("transport") == "local":
-        return LocalTransport(config["database"], state / "member.token")
+        return LocalTransport(config["database"], credential)
     if config.get("transport") == "https":
-        return HTTPTransport(config["endpoint"], state / "member.token", config.get("ca_file"))
+        return HTTPTransport(config["endpoint"], credential, config.get("ca_file"))
     raise ProductError(3, "connection_invalid", "Unknown coordinator transport.")
 
 
@@ -270,6 +276,9 @@ def _setup_binding(root, args):
     if args.command == "init":
         binding.update(mode=args.mode, person=args.person, actor=args.actor, agent=args.agent,
                        purpose=args.purpose, include=args.include)
+        if getattr(args, "coordination_file", None) is not None:
+            from .coordination import validate_configuration
+            binding["coordination"] = validate_configuration(json_file(private_path(args.coordination_file, root)))
     else:
         binding.update(project_id=args.expected_project_id, token_file=str(private_path(args.token_file, root)),
                        database=str(private_path(args.database, root)) if args.database else None,
@@ -364,7 +373,8 @@ def _initial_authority(state, intent):
             _fsync_dir(recovery)
     if not staging.exists():
         Coordinator(staging).initialize(intent["project_id"],
-            {"actor": binding["actor"], "human": binding["person"], "agent": binding["agent"]}, token, snapshot["files"])
+            {"actor": binding["actor"], "human": binding["person"], "agent": binding["agent"]}, token, snapshot["files"],
+            coordination=binding.get("coordination"))
     verify(staging)
     os.link(staging, final)
     _fsync_dir(state)
@@ -483,10 +493,20 @@ def dispatch(bundle, args):
         return {"server": "stopped"}
     root = selected_root(args.project)
     state = private_path(args.state_dir, root)
+    coordination_file = getattr(args, "coordination_file", None)
+    if coordination_file is not None and not coordination_file.strip():
+        raise ProductError(2, "usage_error", "An explicit coordination configuration path must not be empty.")
     if args.command in {"init", "attach"}:
         return _setup(root, state, args)
     metadata = project_manifest(root)
-    transport = connect(state)
+    credential = getattr(args, "session_token_file", None)
+    if credential is not None and not credential.strip():
+        raise ProductError(2, "usage_error", "An explicit session credential path must not be empty.")
+    transport = connect(state, private_path(credential, root) if credential is not None else None)
+    # Identity verification is a read-only membership operation. A bounded session
+    # need not have permission to read the whole project status; actual requested
+    # operations always retain its credential and never fall back to membership.
+    identity_transport = connect(state) if credential is not None else transport
     config = json_file(state / "client/client.json")
     if config.get("project_id") != metadata["project_id"] or config.get("project_root") != str(root):
         raise ProductError(3, "project_mismatch", "Private client state belongs to a different project or local root.")
@@ -494,7 +514,7 @@ def dispatch(bundle, args):
     def request(operation, payload):
         nonlocal checked
         if not checked:
-            identity = transport("status", {})
+            identity = identity_transport("status", {})
             if identity["project_id"] != metadata["project_id"]:
                 raise ProductError(3, "project_mismatch", "Connection points to a different project's authority.")
             checked = True
@@ -505,17 +525,19 @@ def dispatch(bundle, args):
     if args.command == "refresh":
         return client.refresh()
     if args.command == "draft":
-        return client.draft(args.proposal_id, args.assignment_id, args.evidence, json_file(args.claims_file) if args.claims_file else None)
+        return client.draft(args.proposal_id, args.assignment_id, args.evidence, json_file(args.claims_file) if args.claims_file else None,
+                            coordination=json_file(args.coordination_file) if args.coordination_file is not None else None)
     if args.command == "promote-draft":
         return client.promote_preserved(args.preserved_id, args.proposal_id, args.assignment_id, args.evidence,
-                                       json_file(args.claims_file) if args.claims_file else None)
+                                       json_file(args.claims_file) if args.claims_file else None,
+                                       coordination=json_file(args.coordination_file) if args.coordination_file is not None else None)
     if args.command == "submit":
         return client.submit(args.proposal_id)
     if args.command == "team-status":
         return {"coordinator": request("status", {}), "local": client.receipt(), "provider": capabilities(metadata["provider"])}
     if args.command == "coord":
-        if args.operation in {"initialize", "member"}:
-            raise ProductError(2, "use_safe_command", "Use init or member-add so credentials stay outside shared files.")
+        if args.operation in {"initialize", "member", "session-open", "session-delegate"}:
+            raise ProductError(2, "use_safe_command", "Use init, member-add or session-create so credentials stay in private files.")
         payload = json_file(args.payload_file) if args.payload_file else {}
         return request(args.operation, payload)
     if args.command == "member-add":

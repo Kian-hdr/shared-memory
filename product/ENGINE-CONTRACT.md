@@ -6,12 +6,13 @@ remain in force. The live Exlumina Vault is never a test or migration target.
 
 ## Ownership and interfaces
 
-- Engine owner: `product/shared_workspace/engine.py` only.
-- Client owner: `product/shared_workspace/client.py` only.
-- Independent acceptance owner: `product/tests/test_engine.py`, `test_client.py`,
-  `test_team_cli.py` only; may add fixtures under product/tests.
-- Primary: integration, CLI, HTTP transport, provider capability adapters,
-  installation/update/migration preparation, docs/build and Vault handoff.
+- Revision engine: `product/shared_workspace/engine.py`.
+- Opt-in session coordination: `product/shared_workspace/coordination.py`, in the
+  revision engine's existing SQLite transaction.
+- Client materialization and immutable drafts: `product/shared_workspace/client.py`.
+- Explicit full-history upgrade: `product/shared_workspace/coordinator_migration.py`.
+- CLI, HTTP transport, provider delivery and acceptance tests use those boundaries.
+  Current task ownership is maintained separately; this map is not a live claim.
 
 Use Python 3.11+ stdlib. Local coordinator SQLite lives OUTSIDE shared/project
 storage; one authority per project. Readable files materialize accepted snapshots.
@@ -20,7 +21,7 @@ editors cannot be prevented from editing ordinary files; detect and preserve dra
 
 ## Engine Python API
 
-`Coordinator(db_path)` has `initialize(project_id, owner, token, files)` returning
+`Coordinator(db_path)` has `initialize(project_id, owner, token, files, *, coordination=None)` returning
 status, and `request(token, operation, payload)` returning a JSON-serializable dict.
 Initialize accepts canonical UUID, owner {actor, human, agent}, a generated secret
 supplied by caller, and {portable_relative_path: UTF8_text}. Reject existing state.
@@ -28,10 +29,39 @@ Tokens are caller-generated random secrets stored as hashes in DB, never synced.
 All authenticated operations check active membership. Fail using ProductError
 (exit3 malformed,4 operation rejection,5 environment); all DB changes per request
 are atomic with BEGIN IMMEDIATE, rollback on exceptions. Read methods never write.
-State schema version1; refuse unknown versions. Full historical snapshots, proposal
+State schema version 1 by default; explicit coordination config selects version 2.
+Both use protocol 1; unknown schemas are refused and no implicit upgrade occurs.
+Full historical snapshots, proposal
 bytes, decisions and events retained, with hash verification on export/read.
 
-Operations (payload fields; fields marked ? optional):
+## Opt-in schema 2
+
+Coordination config contains `person_id`, `agent_id` and `policy`. Session credentials
+are distinct from membership credentials and bounded by current policy, target scope,
+delegation ancestry and lifetime. Delegation stays within one actor's identity;
+another actor opens its own session. Planned work records an authenticated requester,
+outcome, pinned dependencies and integration actor; `acquire` grants a renewable
+lease with a new generation. Proposals retain session/generation/policy/input context,
+which is checked again at acceptance. The recorded integrator can be an authorized
+contributor agent; a human owner role is not mandatory for routine integration.
+
+Schema 2 replaces legacy `claim`/`receive` with `plan`/`acquire`. Existing mutation
+payloads such as `propose`, `accept`, `resolve`, `reject`, `supersede`, `handoff`,
+`complete` and `transfer-integration` additionally require coordination context.
+Fact authority transfer requires current policy and exact accepted receipt.
+Old pending proposals are preserved but require explicit legacy assignment rebind
+and a new proposal context before further publication. Schema upgrades preserve
+old request bytes and event prefixes.
+
+See [session operation and upgrade instructions](../docs/PRODUCT-V1.md#session-based-coordination)
+for CLI/configuration payloads and [the extension gates](../docs/READINESS.md#approved-autonomous-coordination-and-graph-extension-2026-09-08)
+for required acceptance. Full output versions use `output {assignment_id,output_revision}`;
+`outputs {assignment_id,offset?,limit?}` returns bounded summaries. The independent
+[graph reader](../docs/KNOWLEDGE-GRAPH.md) never grants coordination authority.
+
+## Legacy schema-1 operations
+
+Payload fields below describe schema 1; fields marked ? are optional:
 
 - `status {offset?,limit?}` -> {project_id, revision, files_hash, members, assignments, proposals,
   conflicts}; bounded summaries, no full proposal/conflict file contents or tokens.

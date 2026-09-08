@@ -14,6 +14,8 @@ from . import project
 from . import workflow
 from . import maintenance
 from . import delivery_workflow
+from . import knowledge_workflow
+from . import coordination_workflow
 
 COMMANDS = ("version", "guide", "capabilities", "create", "join", "doctor", "status", "work", "teammate-prompt")
 
@@ -52,18 +54,28 @@ def parser() -> argparse.ArgumentParser:
     workflow.add_commands(commands)
     maintenance.add_commands(commands)
     delivery_workflow.add_commands(commands)
+    knowledge_workflow.add_commands(commands)
+    coordination_workflow.add_commands(commands)
     return result
 
 
 def capabilities() -> dict:
     return {
-        "commands": list(COMMANDS) + list(workflow.TEAM_COMMANDS) + list(maintenance.COMMANDS) + list(delivery_workflow.COMMANDS),
+        "commands": list(COMMANDS) + list(workflow.TEAM_COMMANDS) + list(maintenance.COMMANDS) + list(delivery_workflow.COMMANDS) + list(knowledge_workflow.COMMANDS) + list(coordination_workflow.COMMANDS),
         "implemented": {"selected_folder_setup": True, "portable_project_identity": True,
                         "trusted_bundle_execution": True, "json_output": True,
                         "advisory_claims_handoffs_and_evidence": True,
                         "atomic_coordinator_acceptance": True, "authenticated_membership": True,
                         "preserved_offline_drafts": True, "recoverable_materialization": True,
                         "reviewed_package_installation": True, "local_receipt_verification": True},
+        "coordination_extension": {"opt_in_schema": 2, "default_schema": 1,
+                                   "commands": list(coordination_workflow.COMMANDS),
+                                   "explicit_session_credentials": True, "automatic_renewal": False,
+                                   "live_vault_migration": False, "acceptance": "bounded_local_validation"},
+        "knowledge_graph": {"commands": list(knowledge_workflow.COMMANDS), "read_only": True,
+                            "sources": ["local_selected_folder", "accepted_coordinator_snapshot"],
+                            "parent_vault_reads": False, "policy_authority": False,
+                            "native_rename_command": False},
         "explicit_delivery": {"commands": list(delivery_workflow.COMMANDS),
                               "routes": ["local_fixture", "google_drive_rclone"],
                               "initial_join": "coordinator_attach_required",
@@ -118,7 +130,11 @@ def main(argv=None) -> int:
             if hasattr(args, name) and not getattr(args, name).strip():
                 raise ProductError(2, "usage_error", f"--{name} cannot be empty.")
         with open_bundle(args.bundle) as bundle:
-            if command in delivery_workflow.COMMANDS:
+            if command in coordination_workflow.COMMANDS:
+                data = coordination_workflow.dispatch(bundle, args)
+            elif command in knowledge_workflow.COMMANDS:
+                data = knowledge_workflow.dispatch(bundle, args)
+            elif command in delivery_workflow.COMMANDS:
                 data = delivery_workflow.dispatch(bundle, args)
             elif command in maintenance.COMMANDS:
                 data = maintenance.dispatch(bundle, args)
@@ -128,6 +144,7 @@ def main(argv=None) -> int:
                 data = dict(bundle.build)
             elif command == "guide":
                 data = {"guide": (bundle.root / "PRODUCT-GUIDE.md").read_text(encoding="utf-8"),
+                        "knowledge_graph_guide": (bundle.root / "KNOWLEDGE-GRAPH.md").read_text(encoding="utf-8"),
                         "server_dependencies": (bundle.root / "requirements-server.txt").read_text(encoding="utf-8")}
             elif command == "capabilities":
                 data = capabilities()

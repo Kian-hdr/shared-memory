@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import closing
 import hashlib
 import json
 import os
 from pathlib import Path
 import secrets
+import sqlite3
 import shutil
 import shlex
 import subprocess
@@ -266,10 +268,58 @@ class MaintenanceTests(unittest.TestCase):
         self.assertEqual(authority.request(token, 'snapshot', {}), snapshot)
         self.assertEqual(result['backup_sha256'], maintenance.sha(destination))
         self.assertEqual(result['integrity_check'], 'ok')
+        self.assertTrue(result['history_verified'])
         before = destination.read_bytes()
         with self.assertRaises(ProductError):
             maintenance.backup_coordinator(database, destination)
         self.assertEqual(destination.read_bytes(), before)
+
+    def test_backup_rejects_wrong_identity_and_corrupt_old_history_before_creation(self):
+        database = self.root / 'authority.sqlite3'; token = secrets.token_urlsafe(48)
+        authority = Coordinator(database); identity = str(uuid.uuid4())
+        authority.initialize(identity, {'actor': 'owner', 'human': 'Fixture', 'agent': 'Test'}, token, {'Home.md': 'original'})
+        target = self.root / 'backup.sqlite3'
+        with self.assertRaises(ProductError):
+            maintenance.backup_coordinator(database, target, str(uuid.uuid4()))
+        self.assertFalse(target.exists())
+        with closing(sqlite3.connect(database)) as connection:
+            connection.execute("UPDATE snapshots SET files_json=? WHERE revision=0", ('{"Home.md":"corrupt"}',))
+            connection.commit()
+        before = database.read_bytes()
+        with self.assertRaises(ProductError):
+            maintenance.backup_coordinator(database, target, identity)
+        self.assertFalse(target.exists())
+        self.assertEqual(database.read_bytes(), before)
+
+    def test_backup_verifies_opt_in_coordination_history_and_private_sessions(self):
+        database = self.root / 'v2.sqlite3'; token = secrets.token_urlsafe(48)
+        authority = Coordinator(database); identity = str(uuid.uuid4())
+        authority.initialize(identity, {'actor': 'owner', 'human': 'Fixture', 'agent': 'Test'}, token, {'Home.md': 'original'},
+                             coordination={'person_id': 'person', 'agent_id': 'agent', 'policy': {}})
+        session_token = secrets.token_urlsafe(48)
+        authority.request(token, 'session-open', {'session_id': 'run', 'token': session_token,
+            'ttl_seconds': 300, 'scopes': ['policy'], 'targets': ['.']})
+        before = database.read_bytes()
+        target = self.root / 'v2-backup.sqlite3'
+        result = maintenance.backup_coordinator(database, target, identity)
+        self.assertEqual(result['schema_version'], 2)
+        self.assertTrue(result['history_verified'])
+        self.assertEqual(database.read_bytes(), before)
+        self.assertEqual(Coordinator(target).request(session_token, 'policy', {}), authority.request(session_token, 'policy', {}))
+        self.assertNotIn(session_token, json.dumps(result))
+
+    def test_backup_never_uses_authority_sidecars_or_shared_project_directories(self):
+        database = self.root / 'authority.sqlite3'; token = secrets.token_urlsafe(48)
+        authority = Coordinator(database); identity = str(uuid.uuid4())
+        authority.initialize(identity, {'actor': 'owner', 'human': 'Fixture', 'agent': 'Test'}, token, {'Home.md': 'original'})
+        shared = self.root / 'shared'; shared.mkdir()
+        (shared / '.shared-memory.json').write_text('{}')
+        before = inventory(self.root)
+        for target in [Path(str(database) + suffix) for suffix in ('-journal', '-wal', '-shm')] + [shared / 'backup.sqlite3']:
+            with self.subTest(target=target.name), self.assertRaises(ProductError):
+                maintenance.backup_coordinator(database, target, identity)
+            self.assertFalse(target.exists())
+        self.assertEqual(inventory(self.root), before)
 
     def test_selected_project_cannot_reuse_another_project_client_state(self):
         project_a, state_a, _ = self.init_project('alpha')

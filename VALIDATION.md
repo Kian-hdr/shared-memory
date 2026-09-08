@@ -10,6 +10,61 @@ Historical links below identify runs in the legacy repository and may require ac
 after it becomes private. They are not new-repository CI results. The new repository
 checkpoint below records its own completed validation separately.
 
+## Coordination, graph and upgrade extension, 2026-09-08
+
+The opt-in schema-2 extension passed **273/273 product tests**, with no skips, on
+macOS/Python 3.13.15 and 3.12.13. Schema 1 remains the default. The extension adds
+separate session identities, same-actor narrowed delegation, renewable fenced
+leases, reserved outcome keys, versioned output/interface dependencies, targeted
+policy/inbox updates, defect invalidation and explicit responsibility transfers.
+
+Independent review reproduced an impersonation bug in development delegation before
+this checkpoint. The corrected engine rejects both new cross-actor delegation and
+retained cross-actor child/grandchild credentials without rewriting history. All
+nine distinct-actor role combinations and the original integration bypass were
+independently refused without database-byte changes. Same-actor narrowing and
+ancestor revocation remain enforced. Actual packaged regressions also reject empty
+or whitespace session credentials, empty delegation arguments and empty explicit
+coordination configuration without database, private-session or project writes;
+these inputs can never silently select owner credentials or schema 1. The independent 74-case coordination,
+migration and maintenance suite passed on both runtimes. Policy revision history
+prevents restrict-then-restore from resurrecting stale authority; unaffected roles
+can retain valid context. Exact outcome keys remain reserved after completion.
+
+The actual packaged CLI rehearsal passed **57 commands and four expected refusals**
+on each runtime: separate owner/recipient credentials, duplicate outcomes, overlapping
+leases, stale drafts and stale receipts, two accepted revisions, handoff/completion,
+exact materialization and read-only graph. Private parent notes, home/instructions,
+binary attachments and the immutable old draft remain unchanged. Reusing its output
+directory rejects without changing the fixture. Run it with:
+
+```sh
+python scripts/rehearse_coordination.py --package /reviewed/shared-memory.pyz --output /private/fresh-rehearsal
+```
+
+The output contains synthetic credentials and private state. Only its sanitized
+`report.json` is intended for inspection/sharing. The CI product matrix now runs
+this rehearsal against its exact built package on each OS/runtime; remote results
+must be checked separately before claiming this changed source passed there.
+
+Upgrade tests cover seven actual process-kill boundaries, checkpoint drift, owner
+authentication, exact retry and preserved legacy history. Backup verifies complete
+history and rejects coordinator sidecars/shared-project destinations before writing.
+Two independently inspected 73,400,320-byte immutable outputs remain retrievable;
+paginated summaries measured 1,395 bytes instead of embedding the content.
+
+The graph has 23 analyzer and eight packaged CLI tests. In a separate synthetic
+existing vault, native Obsidian 1.12.7 displayed five selected notes with twelve
+resolved links; graph/backlink navigation and native rename were exercised. Renamed
+note bytes and original app configuration were preserved. Native rename also updated
+one known outer-fixture backlink: it does not enforce the selected-folder write
+boundary. The analyzer reads only its selected root and cannot certify parent links.
+No live Vault migration or new vault registration occurred.
+
+These are synthetic/local engineering results, not real provider delivery,
+independent-recipient onboarding, hosted operations or completed TEAM-11. No public
+release is authorized before finished V1.
+
 ## Private product repository checkpoint, 2026-09-08
 
 At `3b648d08be8f47c698c47375e42c2ee9dc3a45c4`, the new repository's
@@ -52,7 +107,11 @@ CI now stages official rclone 1.75.0 using platform-specific reviewed SHA-256 ha
 in a disposable runner directory, so its Windows/macOS/Linux product jobs exercise
 the actual local driver instead of skipping for missing rclone. The staging script
 was executed on macOS arm64 and verified the downloaded archive hash before extracting
-only its executable. Changed-source CI is still pending at this local checkpoint.
+only its executable. Subsequent exact source `5a6fd30` passed the
+[twelve-job matrix](https://github.com/Kian-hdr/shared-memory/actions/runs/34232620856),
+including real local rclone on every product OS. Its runtime-equivalent `7d88ce3`
+passed the [four-job HTTPS rehearsal](https://github.com/Kian-hdr/shared-memory/actions/runs/34232511551)
+with 98 packaged calls; `5a6fd30` changed only readiness documentation.
 No Google Drive account authentication, publication, sharing or provider request has
 been performed; actual account/recipient/mixed-device gates remain open.
 

@@ -53,3 +53,5 @@ jobs:
         run: python scripts/build_product.py --output "${{ runner.temp }}/shared-memory.pyz"
       - name: Inspect versioned package guide
         run: python "${{ runner.temp }}/shared-memory.pyz" guide
+      - name: Rehearse scoped sessions and recipient handoff
+        run: python scripts/rehearse_coordination.py --package "${{ runner.temp }}/shared-memory.pyz" --output "${{ runner.temp }}/coordination-rehearsal"

@@ -26,6 +26,13 @@ capabilities and the target's existing instructions. Verify bytes before executi
 Use the authoritative init/attach workflow when the supplied package supports it;
 do not silently bootstrap its older advisory tracker instead.
 
+For a newly requested session-coordinated project, use that reviewed package's
+explicit schema-2 init configuration and private person/agent/session bindings.
+Preserve existing schema-1 authorities until a full-history upgrade plan and verified
+private backup satisfy the task's migration scope. Never silently upgrade on attach.
+Read the selected folder's graph diagnostics when links matter; local graph results
+and authenticated accepted-snapshot results are distinct. Neither is sharing proof.
+
 Reuse working local components. Install only missing compatible Python or optional
 server dependencies within this setup authorization, preserving prior runtimes and
 configuration. Routine steps do not need repeated confirmation. Respect my agent

@@ -174,6 +174,77 @@ No migration/restructuring or sharing change to that live Vault or backup drives
 authorized before that confirmation. Report blocked readiness precisely if actual
 provider/recipient/mixed-device gates are unavailable.
 
+## Approved autonomous coordination and graph extension, 2026-09-08
+
+These accepted requirements extend the current implementation. They are not passed
+capabilities. Keep private development until finished V1 and retain TEAM-01–TEAM-11.
+
+Autonomy is primary: discover available setup details and ask only for essential
+undiscoverable folder/execution/membership/budget/constraint choices. Routine work
+within established scope proceeds without discretionary permission prompts. Task
+limits, confidentiality and mandatory platform/authentication controls still apply.
+
+### Identity, planning and safe integration
+
+- Distinguish requester, person, agent, running session, assignment and delegated
+  scope. Project owners set objectives/membership/budgets/rules; coordinating agents
+  plan/schedule/replan; integration owners may be authorized agents; workers claim
+  bounded work; reviewers independently verify consequential results; the service
+  enforces recorded decisions. Human review is not a mandatory routine bottleneck.
+- Reserve intended outcomes as well as files/resources. Record acceptance criteria,
+  inputs/outputs, dependencies and integration owners. Atomically grant exclusive
+  claims and detect existing equivalent outcome requests. Likely semantic duplicates
+  are review signals, not proof of perfect duplicate detection.
+- Extend planning to a queued/ready dependency graph with explicit input/interface
+  revisions and invalidation. The current completed-dependencies-only claim rule
+  does not satisfy this. Workers may proceed against agreed interfaces while
+  implementation and tests develop independently.
+- Isolate worktrees/proposal areas and integrate under recorded authority. Renewable
+  ownership leases and generation/fencing tokens prevent reassigned old sessions
+  from publishing. Offline work remains private drafts and cannot assert new global
+  ownership. Preserve direct editor changes and previous accepted results/history.
+
+### Targeted events, policies and defects
+
+Durable inboxes/events with acknowledgements route upstream changes, defects,
+ownership transfers and authenticated rule/constraint updates. Bind assignments to
+relevant dependency/policy revisions and check them before submission/acceptance.
+Arbitrary note text cannot become authoritative policy. Identify affected downstream
+work and pause only those tasks while independent tasks continue. Stopped agents
+catch up when resumed; continuous awareness requires a running consumer.
+
+Defects retain reproducible evidence, responsible owners and downstream impact.
+Replan/recover autonomously where recorded rules determine the next action. Preserve
+previous results and history rather than overwriting the record of incorrect work.
+
+### Useful knowledge graph and Obsidian acceptance
+
+Keep the independent readable-folder core, optional Obsidian and shared-subfolder
+placement inside existing private vaults. Link canonical knowledge, projects,
+decisions, evidence and work records through compatible Markdown/frontmatter/
+wikilinks. Provide portable link resolution, backlinks and integrity checks during
+renames/moves. Runtime/session artifacts must not clutter the graph; credentials
+never belong in notes. Notes and graph metadata do not silently grant policy authority.
+
+Validate actual graph/navigation behavior in an isolated Obsidian fixture before
+claiming UI compatibility. YAML/link checks alone are insufficient. This does not
+require a new production vault or authorize migration of the live Vault. A bounded
+read-only graph analyser is the first implementation step; safe rename/move and
+native UI verification remain distinct follow-up acceptance work.
+
+| Extension gate | Required observable result |
+| --- | --- |
+| COORD-01 | Simultaneous claims grant one exclusive owner; duplicate outcome requests do not create parallel accepted work |
+| COORD-02 | Queued dependency work becomes ready on the required input/interface versions, without blocking unrelated ready tasks |
+| COORD-03 | Worker crash, lease expiration and reassignment preserve drafts/history; an old session cannot submit or integrate with stale fencing tokens |
+| COORD-04 | Same-file edits remain preserved proposals with controlled integration, including pending proposals across ownership transfer |
+| COORD-05 | Authenticated policy changes invalidate affected running work before submit/accept and leave independent work progressing |
+| COORD-06 | Incorrect upstream results route reproducible defects, invalidate affected downstream inputs and support reviewed autonomous replanning |
+| COORD-07 | Targeted inbox entries survive consumer shutdown, resume and acknowledgement without silently missing relevant changes |
+| GRAPH-01 | Portable Markdown/wikilinks/aliases/anchors resolve with deterministic backlinks and explicit missing/ambiguous diagnostics inside the selected scope |
+| GRAPH-02 | Authorized isolated rename/move preserves note bytes/metadata and updates or flags every affected link without touching private parent/runtime files |
+| GRAPH-03 | The isolated Obsidian fixture visibly supports useful graph and link/backlink navigation; actual UI evidence is captured separately from parser tests |
+
 ## Implementation sequence and first acceptance suite
 
 First turn the scenarios below into executable acceptance tests against the actual
@@ -304,7 +375,17 @@ TEAM-11. Repository separation is authorized. Public visibility must wait for co
 version 1; deployment and provider readiness remain separate requirements. Live Vault migration remains gated on validated readiness and
 the owner's confirmed backup, second-drive working copy and target.
 
-## Current decision
+### Validated local coordination extension
+
+The opt-in schema-2 implementation now passes 273 local product tests on both
+Python 3.13 and 3.12. A real packaged 57-command rehearsal covers separate actor
+sessions, fenced ownership, duplicate/overlap refusal, recipient handoff, stale
+context refusal and exact revision receipt. Same-actor delegation preserves identity;
+another person creates their own authenticated session. Completed outcomes retain
+their keys. Migration/backup and graph/native-Obsidian evidence is recorded in
+[validation](../VALIDATION.md). This does not complete real provider/recipient gates.
+
+## Legacy toolkit decision
 
 Use this toolkit for a controlled, reversible pilot with named owners and explicit
 checkpoints. Do not rely on it as the sole coordination or audit mechanism for
@@ -316,7 +397,7 @@ explicit local-only setup, portable project-folder dashboards and stronger chang
 new recipient machines remain separate steps. See [validation](../VALIDATION.md)
 for the exact evidence, and [the demo](DEMO.md) for a concrete walkthrough.
 
-## What the toolkit actually does
+## What the legacy toolkit actually does
 
 Ordinary Markdown holds project instructions, work ownership, dependency revisions,
 acceptance criteria, evidence and handoffs. The tracker checks that recorded context
@@ -328,19 +409,19 @@ files, run agents, supply an AI memory service, or acquire distributed locks. It
 completion status verifies supplied acceptance metadata and recorded file state;
 it does not independently judge a deliverable's quality.
 
-## Before presenting or sharing the candidate
+## Before presenting or sharing the current product
 
 | Gate | Acceptance evidence | Current scope |
 | --- | --- | --- |
 | Reproducible workflow | Fresh demo passes, expected failures preserve records, both handoff criteria verified | Local scripted demonstration |
 | Change detection | Regressions for directory children, undeclared targets, large files and completion drift | Local tests, see validation record |
 | Attendee entry point | Compact prompt, diagnostic next steps, no account requirement for local-only | Implemented; fresh-machine onboarding still open |
-| Optional visual rehearsal | If a dashboard demonstration is requested, open the generated Base directly in the existing vault | Deferred; folder-only setup requires no app launch |
+| Optional visual rehearsal | Isolated selected-folder graph/navigation checked in native Obsidian | Synthetic fixture verified; ordinary folder setup needs no app launch |
 | Stage rehearsal | Run in the presentation environment within the available speaking time; test TV connection | Presenter/venue check still needed |
-| Audience download | Review and publish the exact tested revision, then verify the public setup link | Candidate remains local until publication is authorized |
+| Audience download | Complete V1 release gates before any public installation promise | Product remains private; pitch has no public setup link |
 
 Keep the five-minute pitch focused on the problem, ordinary files, one concrete
-handoff and the setup link. The 90-second demo is an optional walkthrough, not
+handoff and the remaining acceptance work. The 90-second demo is an optional walkthrough, not
 additional time on top of the existing five-minute talk. Do not describe scripted
 actors as independent AI agents or imply distributed locking from an overlap test.
 

@@ -34,6 +34,18 @@ def _error(code, message, exit_code=3):
     raise ProductError(exit_code, code, message)
 
 
+def _draft_coordination(value):
+    """Freeze context supplied for this work, without refreshing stale authority."""
+    if (not isinstance(value, dict) or set(value) != {'session_id', 'generation', 'policy_revision', 'input_hash'}
+            or not isinstance(value['session_id'], str)
+            or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]{0,127}', value['session_id'])
+            or any(type(value[key]) is not int or value[key] < 1 for key in ('generation', 'policy_revision'))
+            or not isinstance(value['input_hash'], str)
+            or not re.fullmatch(r'[0-9a-f]{64}', value['input_hash'])):
+        _error('invalid_coordination', 'Draft requires the exact session, generation, policy revision and input hash for its assigned work.')
+    return dict(value)
+
+
 def _json(value):
     return json.dumps(value, sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode('utf-8')
 
@@ -606,7 +618,7 @@ class Client:
                         byte_source='provider_download', authority_check=authority)
 
     @_io_errors
-    def draft(self, proposal_id, assignment_id, evidence, claims=None):
+    def draft(self, proposal_id, assignment_id, evidence, claims=None, *, coordination=None):
         for label, value in [('proposal_id', proposal_id), ('assignment_id', assignment_id)]:
             if not isinstance(value, str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]{0,127}', value):
                 _error('invalid_identity', label + ' must be a safe, nonempty identifier.')
@@ -624,11 +636,13 @@ class Client:
             proposal = {'proposal_id': proposal_id, 'base_revision': base['revision'],
                         'changes': changes, 'evidence': evidence, 'assignment_id': assignment_id,
                         'claims': [] if claims is None else claims}
+            if coordination is not None:
+                proposal['coordination'] = _draft_coordination(coordination)
             self._immutable('drafts/' + proposal_id + '.json', proposal)
             return proposal
 
     @_io_errors
-    def promote_preserved(self, preserved_id, proposal_id, assignment_id, evidence, claims=None):
+    def promote_preserved(self, preserved_id, proposal_id, assignment_id, evidence, claims=None, *, coordination=None):
         """Review preserved original bytes into an assigned offline proposal."""
         for label, value in [('preserved_id', preserved_id), ('proposal_id', proposal_id), ('assignment_id', assignment_id)]:
             if not isinstance(value, str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]{0,127}', value):
@@ -648,6 +662,8 @@ class Client:
             proposal = {'proposal_id': proposal_id, 'base_revision': preserved['base_revision'],
                         'changes': preserved['changes'], 'evidence': evidence,
                         'assignment_id': assignment_id, 'claims': [] if claims is None else claims}
+            if coordination is not None:
+                proposal['coordination'] = _draft_coordination(coordination)
             self._immutable('drafts/' + proposal_id + '.json', proposal)
             return proposal
 

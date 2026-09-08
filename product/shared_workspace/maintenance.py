@@ -41,6 +41,7 @@ def add_commands(commands):
     backup = commands.add_parser("backup-coordinator", help="Create an isolated transaction-consistent coordinator backup")
     backup.add_argument("--database", required=True)
     backup.add_argument("--destination", required=True)
+    backup.add_argument("--expected-project-id", help="Reject an authority belonging to another project before creating backup")
     recover = commands.add_parser("recover-coordinator", help="Recover a private coordinator hot journal without changing accepted history")
     recover.add_argument("--database", required=True)
 
@@ -246,19 +247,45 @@ def git_isolate(args):
             "uncommitted_changes_included": False, "coordinator_claim": "Must be acquired separately with bounded assignment and integration owner."}
 
 
-def backup_coordinator(database, destination):
+def backup_coordinator(database, destination, expected_project_id=None):
     database, destination = private_path(database), private_path(destination)
     if not database.is_file() or destination.exists() or not destination.parent.is_dir():
         raise ProductError(3, "backup_target_invalid", "Choose an existing coordinator and a fresh private local backup destination.")
-    # SQLite backup API captures a consistent snapshot while the authority operates.
+    from .engine import Coordinator
+    from .coordinator_migration import verify_checkpoint, _backup_path
+    from .client import _fsync_dir
+    engine = Coordinator(database)
+    destination = _backup_path(destination, engine)
+    # One read transaction pins every historical record and its exact backup.
+    # This is local-file maintenance, not a remotely callable membership operation.
     with closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)) as source:
+        source.row_factory = sqlite3.Row
+        source.execute("BEGIN")
+        schema = source.execute("PRAGMA user_version").fetchone()[0]
+        identity = engine._schema(source)['project_id']
+        checkpoint = verify_checkpoint(source, engine, expected_schema=schema,
+            expected_project_id=expected_project_id or identity)
         with os.fdopen(os.open(destination, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600), "wb"):
             pass
+        deadline = time.monotonic() + 60
+        def progress(status, remaining, total):
+            if time.monotonic() > deadline:
+                raise ProductError(5, 'backup_timeout', 'Backup deadline exceeded; preserve its partial file and original authority.')
         with closing(sqlite3.connect(destination)) as target:
-            source.backup(target)
-            if target.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
-                raise ProductError(5, "backup_invalid", "Backup integrity check failed; original authority is unchanged.")
+            target.row_factory = sqlite3.Row
+            target.execute('PRAGMA synchronous=FULL')
+            source.backup(target, pages=128, progress=progress, sleep=0.05)
+            target.execute('BEGIN')
+            verified = verify_checkpoint(target, Coordinator(destination), expected_schema=schema,
+                                         expected_project_id=identity)
+            if verified['checkpoint'] != checkpoint['checkpoint']:
+                raise ProductError(5, "backup_invalid", "Backup history differs from the pinned authority; preserve both files.")
+    with destination.open('rb') as stream:
+        os.fsync(stream.fileno())
+    _fsync_dir(destination.parent)
     return {"backup_sha256": sha(destination), "integrity_check": "ok", "source_changed": False,
+            "history_verified": True, "schema_version": schema, "project_id": identity,
+            "checkpoint": checkpoint['checkpoint'],
             "restore": "Stop the authority and verify project identity/history before selecting a restored private database; never overwrite active state automatically."}
 
 
@@ -277,7 +304,7 @@ def dispatch(bundle, args):
     if args.command == "git-isolate":
         return git_isolate(args)
     if args.command == "backup-coordinator":
-        return backup_coordinator(args.database, args.destination)
+        return backup_coordinator(args.database, args.destination, args.expected_project_id)
     if args.command == "recover-coordinator":
         from .engine import Coordinator
         return Coordinator(private_path(args.database)).recover()

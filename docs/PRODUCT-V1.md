@@ -153,7 +153,148 @@ conflicting bytes as drafts. `refresh` resumes an existing client; an interrupte
 `attach` can be retried with its original arguments and immutable setup intent.
 It never overwrites a different private connection.
 
-## Daily agent workflow
+## Session-based coordination
+
+New projects can explicitly enable schema 2 with `init --coordination-file CONFIG.json`.
+Keep that file in private local storage. Its bounded configuration is:
+
+```json
+{"person_id":"person-1","agent_id":"agent-1","policy":{}}
+```
+
+An empty policy selects documented engine defaults; it does not remove permission
+checks. Omitting the option preserves schema 1. Existing authorities never upgrade
+implicitly. Person and agent IDs are project bindings, not independently verified
+real-world identities. A member credential can register another member, then use
+`coord member-binding` with `actor`, `person_id` and `agent_id` before that member
+opens a session. Session credentials cannot mint unrestricted member credentials.
+
+Inspect `coord policy` to obtain current allowed operations and revision. Prepare a
+private grants JSON with `ttl_seconds`, an explicit `scopes` operation list, and
+project-relative `targets`. Create one distinct session for each running worker:
+
+```text
+python PACKAGE.pyz session-create PROJECT --state-dir STATE --session-id run-1 --grants-file GRANTS.json
+```
+
+The result identifies a private credential file. Use that exact file with
+`--session-token-file` on subsequent `coord`, `draft`, `submit` and other supported
+work commands. The durable private intent preserves the credential across retries;
+repeating the same command does not extend its lifetime. Changed grants require a
+different session identity. Do not share the intent or token in project notes.
+Delegation adds `--delegate-to SAME_ACTOR --session-token-file PARENT_TOKEN`; child
+operations, targets and lifetime cannot exceed the parent's current grants.
+It cannot mint credentials for another actor, including another project owner.
+Assign another actor work through planning or handoff; that actor opens its own
+authenticated session. Those steps can run autonomously within existing authority.
+Revoking a parent also fences its descendants. There is no background renewal loop.
+
+Schema 2 uses `plan` followed by `acquire`, rather than the legacy `claim` route.
+A plan includes:
+
+```json
+{
+  "assignment_id":"notes-1", "outcome_key":"review-project-notes",
+  "summary":"Review the project notes",
+  "targets":["Research/"], "criteria":["Validate sources and links"],
+  "dependencies":[], "interface_paths":[], "resource_limits":{"max_files":20},
+  "integration_owner":"owner-1", "policy_revision":1
+}
+```
+
+Use the current policy revision, never assume it remains 1. Plans reserve exact
+outcome keys and report likely duplicates using advisory word overlap. Acquiring
+work additionally requires `assignment_id`, `expected_generation`, `ttl_seconds`,
+the current accepted `revision` and `files_hash`, and `policy_revision`. Only one
+live lease can own overlapping targets. A replacement session receives a new
+generation; retaining old files or a payload session ID grants no authority.
+
+Pin the acquired context in a private JSON file with `session_id`, `generation`,
+`policy_revision` and `input_hash`. Supply it to `draft --coordination-file` or
+`promote-draft --coordination-file`. The draft preserves its original bytes, base
+revision and context. Submission never silently refreshes a stale policy or lease.
+An unrelated role's policy change can leave this context valid. The engine compares
+every intervening rule revision for the worker and its delegation ancestors. A
+restriction followed by restoration cannot revive an old proposal, and acceptance
+checks the producer and integrator separately. After reassignment or relevant
+policy/input changes, preserve the old draft and prepare a new
+proposal with evidence and the new acquired context. `renew` extends a still-valid
+lease within policy and session lifetime; it cannot revive expired ownership.
+
+Integration is performed by the recorded integration actor, which can be an
+authorized agent. `accept` adds that actor's authenticated session context to the
+ordinary proposal ID, validation and reason. The engine checks both integrator
+authority and the original proposing session, generation, policy and inputs.
+Evidence is still an assertion that the actor must substantiate; the coordinator
+does not run arbitrary tests or establish factual truth. Human review is not a
+mandatory routine step when an agent already holds the required authority.
+
+An output dependency pins `assignment_id`, `output_revision` and `interface_hash`
+and waits for producer completion. An interface dependency uses `kind:"interface"`,
+`interface_revision` and `interface_hash`; it can run while implementation remains
+active after the producer publishes its agreed contract through `interface-publish`.
+Contract publication records bounded text and evidence, not completed implementation.
+`outputs` returns paginated metadata (`assignment_id`, optional `offset` and `limit`);
+use `output` with `assignment_id` and `output_revision` for one complete preserved
+version. Requester identity is recorded from the authenticated planning session and
+survives acquisition by another worker.
+
+For disputed structured facts, `resolve` requires the responsible owner's session,
+proposal ID, resolutions and current coordination context; integration still follows
+through `accept`. `reject` and `supersede` also require current integration context
+and retain original requests. Responsibility can be deliberately transferred:
+`transfer-integration` takes `assignment_id`, `to_actor`, `reason` and `coordination`;
+`transfer-authority` takes `key`, `to_actor`, `evidence`, `reason`, `policy_revision`,
+`revision` and `files_hash` through a project-wide scoped responsible-owner session.
+Transfer responsibilities before revocation, which cannot orphan them.
+
+Authenticated `policy-update`, `defect-report`, `replan` and `defect-resolve` record
+changed rules, version-specific problems and recovery evidence. Affected work is
+invalidated transitively; unrelated work can continue. Read paginated `inbox` entries
+and `ack` their message IDs. Consumers catch up when they run; no always-on worker
+or automatic notification service is bundled. Arbitrary note text never becomes
+policy. Inspect actual command results and the extension acceptance record before
+claiming production or provider readiness.
+
+## Explicit coordinator upgrade and backup
+
+For an existing local schema-1 authority, prepare the same private coordination
+configuration and obtain a read-only full-history checkpoint:
+
+```text
+python PACKAGE.pyz coordination-plan-upgrade --database DATABASE --token-file OWNER_TOKEN --expected-project-id PROJECT_ID --coordination-file CONFIG.json
+python PACKAGE.pyz coordination-upgrade --database DATABASE --token-file OWNER_TOKEN --expected-project-id PROJECT_ID --coordination-file CONFIG.json --expected-checkpoint CHECKPOINT --backup-destination FRESH_PRIVATE_BACKUP --migration-id upgrade-1
+```
+
+The upgrade authenticates an active owner, writes and verifies a private backup
+before its exclusive transaction, and refuses intervening authority changes. Schema,
+history and the upgrade event commit together. A retry after a committed lost response
+requires the exact original configuration, checkpoint, migration ID and retained
+backup. A pre-commit failure preserves its backup and needs a fresh destination for
+another attempt. No automatic restore or downgrade occurs.
+
+Legacy assignments require explicit `rebind` under the authenticated integration
+actor. It records reviewed outcome/dependencies, current receipt/policy and evidence;
+old proposal request bytes remain unchanged. Old pending proposals are retained as
+legacy-blocked history and cannot be submitted as new session-fenced work.
+This command upgrades a coordinator, not a live vault's folder structure or notes.
+
+`backup-coordinator --database DATABASE --destination FRESH_PRIVATE_BACKUP
+--expected-project-id PROJECT_ID` separately captures and verifies complete schema-1
+or schema-2 history. It checks every stored snapshot, proposal, document and event
+chain, then compares the backup with the pinned source checkpoint and flushes it
+to local storage. Preserve the authority and partial backup after a failure.
+
+## Knowledge graph
+
+`graph PROJECT` reads only the selected folder without changing it or requiring
+configuration. `graph PROJECT --accepted --state-dir STATE` analyzes the current
+authenticated accepted snapshot, independently of local drafts. Both return typed
+nodes, links, backlinks and explicit diagnostics; neither grants policy authority.
+See [the knowledge graph guide](KNOWLEDGE-GRAPH.md) for supported Markdown, privacy
+bounds and the separate native Obsidian rename/navigation validation.
+
+## Legacy schema-1 daily agent workflow
 
 1. Run `refresh PROJECT --state-dir STATE`, then `team-status` and `context --query
    "relevant question"`. Status returns summaries; use authenticated `coord proposal`/`coord conflict` to

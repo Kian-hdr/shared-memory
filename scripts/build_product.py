@@ -75,6 +75,7 @@ def build(output: Path) -> dict:
             payload["bundle/skills/setup-shared-project-workspace/" + source.relative_to(skill).as_posix()] = source.read_bytes()
     payload["LICENSE"] = (ROOT / "LICENSE").read_bytes()
     payload["PRODUCT-GUIDE.md"] = (ROOT / "docs/PRODUCT-V1.md").read_bytes()
+    payload["KNOWLEDGE-GRAPH.md"] = (ROOT / "docs/KNOWLEDGE-GRAPH.md").read_bytes()
     payload["requirements-server.txt"] = (ROOT / "requirements-server.txt").read_bytes()
     files = {name: hashlib.sha256(data).hexdigest() for name, data in sorted(payload.items())}
     bundle_id = hashlib.sha256(json.dumps(files, sort_keys=True, separators=(",", ":")).encode()).hexdigest()

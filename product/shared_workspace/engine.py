@@ -21,6 +21,7 @@ from pathlib import Path, PurePosixPath
 from .errors import ProductError
 
 SCHEMA_VERSION = 1
+COORDINATION_SCHEMA_VERSION = 2
 MAX_FILE_BYTES = 10 * 1024 * 1024
 MAX_SNAPSHOT_BYTES = 100 * 1024 * 1024
 MAX_FILES = 10000
@@ -190,7 +191,8 @@ class Coordinator:
         return connection
 
     def _schema(self, connection):
-        if connection.execute("PRAGMA user_version").fetchone()[0] != SCHEMA_VERSION:
+        version = connection.execute("PRAGMA user_version").fetchone()[0]
+        if version not in (SCHEMA_VERSION, COORDINATION_SCHEMA_VERSION):
             malformed("Unknown or incomplete coordinator schema; no migration was attempted.")
         row = connection.execute("SELECT value FROM meta WHERE key='state'").fetchone()
         if not row:
@@ -209,6 +211,9 @@ class Coordinator:
         initial = connection.execute("SELECT event_json FROM events WHERE seq=1").fetchone()
         if not initial or json.loads(initial[0])["data"]["project_id"] != state["project_id"]:
             malformed("Project identity differs from immutable initialization history.")
+        if version == COORDINATION_SCHEMA_VERSION:
+            from . import coordination
+            coordination.verify_schema(connection)
         return state
 
     def _token(self, token):
@@ -309,6 +314,9 @@ class Coordinator:
                     "timestamp": timestamp(), "revision": revision, "data": payload}
         hashed = hashlib.sha256((previous + canonical(document)).encode("utf-8")).hexdigest()
         connection.execute("INSERT INTO events(event_json,event_hash,previous_hash) VALUES(?,?,?)", (canonical(document), hashed, previous))
+        if connection.execute("PRAGMA user_version").fetchone()[0] == COORDINATION_SCHEMA_VERSION:
+            from . import coordination
+            coordination.record_event(connection)
 
     def _proposal(self, connection, proposal_id):
         row = connection.execute("SELECT * FROM proposals WHERE id=?", (proposal_id,)).fetchone()
@@ -354,6 +362,8 @@ class Coordinator:
     def _assignment_summary(document):
         keys = ("assignment_id", "actor", "integration_owner", "base_revision", "status")
         result = {key: document[key] for key in keys}
+        result.update({key: document[key] for key in ('outcome_key', 'generation', 'plan_revision',
+                        'person_id', 'agent_id', 'lease', 'input_hash', 'requester') if key in document})
         result.update({key + "_count": len(document.get(key, []))
                        for key in ("targets", "criteria", "dependencies", "handoffs")})
         result.update(detail_hash=digest(document), details_available=True)
@@ -387,10 +397,14 @@ class Coordinator:
         totals = {table: connection.execute(f"SELECT count(*) FROM {table}").fetchone()[0] for table in collections}
         next_offsets = {table: offset + len(items) if offset + len(items) < totals[table] else None
                         for table, items in collections.items()}
-        return {**state, "files_hash": hashed, **collections,
-                "paging": {"offset": offset, "limit": limit, "totals": totals, "next_offsets": next_offsets}}
+        result = {**state, "files_hash": hashed, **collections,
+                  "paging": {"offset": offset, "limit": limit, "totals": totals, "next_offsets": next_offsets}}
+        if connection.execute("PRAGMA user_version").fetchone()[0] == COORDINATION_SCHEMA_VERSION:
+            from . import coordination
+            result['coordination'] = coordination.summary(connection)
+        return result
 
-    def initialize(self, project_id, owner, token, files):
+    def initialize(self, project_id, owner, token, files, *, coordination=None):
         try:
             if str(uuid.UUID(project_id)) != project_id:
                 raise ValueError()
@@ -401,6 +415,9 @@ class Coordinator:
         human, agent = text(owner["human"], "human"), text(owner["agent"], "agent")
         hashed_token = self._token(token)
         files = validate_files(files)
+        if coordination is not None:
+            from .coordination import validate_configuration
+            coordination = validate_configuration(coordination)
         connection = None
         try:
             self.db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -426,6 +443,10 @@ class Coordinator:
             connection.execute("INSERT INTO meta VALUES('state',?)", (canonical(state),))
             connection.execute("INSERT INTO members VALUES(?,?,?,?,?,1)", (actor, human, agent, "owner", hashed_token))
             connection.execute("INSERT INTO snapshots VALUES(?,?,?,?,?)", (0, canonical(files), files_hash(files), "{}", digest({})))
+            if coordination is not None:
+                from .coordination import initialize_schema
+                initialize_schema(connection, self, actor, coordination)
+                connection.execute(f"PRAGMA user_version={COORDINATION_SCHEMA_VERSION}")
             self._event(connection, actor, "initialize", {"project_id": project_id, "files_hash": files_hash(files)}, 0)
             result = self._status(connection, state)
             connection.commit()
@@ -443,20 +464,28 @@ class Coordinator:
                 connection.close()
 
     def request(self, token, operation, payload):
-        if not isinstance(operation, str) or operation not in OPERATIONS or not isinstance(payload, dict):
+        from . import coordination
+        reads = READ_OPERATIONS | coordination.READ_OPERATIONS
+        if not isinstance(operation, str) or operation not in OPERATIONS | coordination.OPERATIONS or not isinstance(payload, dict):
             malformed("Unknown coordinator operation or invalid payload.")
         if len(canonical(payload).encode("utf-8")) > MAX_RESPONSE_BYTES:
             malformed("Request exceeds the 128 MiB envelope limit.")
         connection = None
         try:
-            connection = self._connect(readonly=operation in READ_OPERATIONS)
-            connection.execute("BEGIN" if operation in READ_OPERATIONS else "BEGIN IMMEDIATE")
+            connection = self._connect(readonly=operation in reads)
+            connection.execute("BEGIN" if operation in reads else "BEGIN IMMEDIATE")
             state = self._schema(connection)
-            member = self._auth(connection, token)
-            if operation not in READ_OPERATIONS and member["role"] == "reader":
+            enhanced = connection.execute("PRAGMA user_version").fetchone()[0] == COORDINATION_SCHEMA_VERSION
+            member = coordination.authenticate(connection, self, token) if enhanced else self._auth(connection, token)
+            if operation not in reads and member["role"] == "reader" and operation not in {'session-open', 'session-revoke', 'ack'}:
                 rejected("Read-only members cannot mutate coordinator state.")
             self._events(connection)
-            result = getattr(self, "_op_" + operation.replace("-", "_"))(connection, state, member, payload)
+            if enhanced:
+                result = coordination.dispatch(connection, self, state, member, operation, payload)
+            elif operation in OPERATIONS:
+                result = getattr(self, "_op_" + operation.replace("-", "_"))(connection, state, member, payload)
+            else:
+                rejected('This operation requires explicit schema 2 coordination initialization.')
             if len(canonical(result).encode("utf-8")) > MAX_RESPONSE_BYTES:
                 rejected("Response exceeds 128 MiB; use a bounded snapshot or revise the workload.")
             connection.commit()
@@ -499,6 +528,9 @@ class Coordinator:
             for row in connection.execute("SELECT id FROM proposals"):
                 self._proposal(connection, row[0])
                 proposals += 1
+            if connection.execute("PRAGMA user_version").fetchone()[0] == COORDINATION_SCHEMA_VERSION:
+                from . import coordination
+                coordination.verify_schema(connection, full=True)
             connection.commit()
             return {**state, "files_hash": hashed, "status": "recovered", "logical_state_changed": False,
                     "events_verified": events, "proposals_verified": proposals,
@@ -614,10 +646,11 @@ class Coordinator:
     def _op_transfer_integration(self, connection, state, member, payload):
         fields(payload, {"assignment_id", "to_actor", "reason"})
         assignment = self._document(connection, "assignments", identifier(payload["assignment_id"]))
-        self._owner(connection, member["actor"])
+        if not member.get('_session'):
+            self._owner(connection, member["actor"])
         if assignment["integration_owner"] != member["actor"] or assignment["status"] == "completed":
             rejected("Only the current integration owner can transfer an active assignment's integration responsibility.")
-        recipient = self._owner(connection, identifier(payload["to_actor"], "to_actor"))
+        recipient = (self._member if member.get('_session') else self._owner)(connection, identifier(payload["to_actor"], "to_actor"))
         if recipient["actor"] == member["actor"]:
             rejected("Integration transfer requires a different active owner.")
         reason = text(payload["reason"], "integration transfer reason")
@@ -685,7 +718,8 @@ class Coordinator:
         return result
 
     def _op_propose(self, connection, state, member, payload):
-        fields(payload, {"proposal_id", "base_revision", "changes", "evidence", "assignment_id"}, {"claims"})
+        optional = {'claims', 'coordination'} if member.get('_session') else {'claims'}
+        fields(payload, {"proposal_id", "base_revision", "changes", "evidence", "assignment_id"}, optional)
         proposal_id = identifier(payload["proposal_id"], "proposal_id")
         assignment_id = identifier(payload["assignment_id"], "assignment_id")
         proposal_request = {**payload, "claims": payload.get("claims", [])}
@@ -740,7 +774,8 @@ class Coordinator:
 
     def _integration(self, connection, member, proposal):
         assignment = self._document(connection, "assignments", proposal["assignment_id"])
-        self._owner(connection, member["actor"])
+        if not member.get('_session'):
+            self._owner(connection, member["actor"])
         if member["actor"] != assignment["integration_owner"]:
             rejected("Only this assignment's integration owner may make the acceptance decision.")
         return assignment
@@ -787,7 +822,8 @@ class Coordinator:
                 self._put(connection, "conflicts", conflict["conflict_id"], conflict)
 
     def _op_accept(self, connection, state, member, payload):
-        fields(payload, {"proposal_id", "validation", "reason"}, {"resolutions"})
+        optional = {'resolutions', 'coordination'} if member.get('_session') else {'resolutions'}
+        fields(payload, {"proposal_id", "validation", "reason"}, optional)
         validation, reason = text(payload["validation"], "validation"), text(payload["reason"], "acceptance reason")
         proposal = self._proposal(connection, identifier(payload["proposal_id"]))
         assignment = self._integration(connection, member, proposal)

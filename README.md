@@ -17,6 +17,12 @@ runtime coordinates ownership, proposals, accepted revisions and handoffs;
 Existing Obsidian users can share the same project folder inside their own private
 vaults. You do not need a new vault or to share your private parent vault.
 
+Current private development adds opt-in session-based coordination, dependency
+interfaces, durable inboxes, explicit backed-up schema upgrades and a read-only
+knowledge graph. See [the operating guide](docs/PRODUCT-V1.md) and
+[graph guide](docs/KNOWLEDGE-GRAPH.md). These extensions remain subject to integrated
+validation and the real-provider/independent-recipient gates for V1.
+
 The repository includes a copyable `AGENTS.md`, a complete setup skill, the product
 runtime and a legacy advisory Python tracker. [See the project-folder workflow](skills/setup-shared-project-workspace/references/project-folder-sharing.md).
 
