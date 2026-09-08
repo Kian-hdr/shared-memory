@@ -86,7 +86,7 @@ class ProductCLITests(unittest.TestCase):
             self.fail('Operational stdout is not exactly one JSON object:\n' + result.stdout + result.stderr)
         self.assertIsInstance(response, dict)
         self.assertEqual(response.get('schema_version'), 1)
-        self.assertEqual(response.get('product_version'), '0.2.0')
+        self.assertEqual(response.get('product_version'), '0.2.1')
         self.assertTrue({'command', 'ok', 'code', 'data', 'warnings'} <= response.keys(), response)
         self.assertIsInstance(response['warnings'], list)
         self.assertEqual(response['ok'], expected == 0, response)
@@ -129,7 +129,7 @@ class ProductCLITests(unittest.TestCase):
         return target
 
     def test_build_identity_and_hashes_cover_actual_package_bytes(self):
-        self.assertEqual(self.build['product_version'], '0.2.0')
+        self.assertEqual(self.build['product_version'], '0.2.1')
         self.assertEqual(self.build['toolkit_version'], '1.3.0')
         self.assertIsInstance(self.build['source_revision'], str)
         self.assertIsInstance(self.build['source_dirty'], bool)
@@ -192,7 +192,7 @@ class ProductCLITests(unittest.TestCase):
         self.assertEqual(meta['format_version'], 1)
         uuid.UUID(meta['project_id'])
         self.assertEqual(meta['mode'], 'local-only')
-        self.assertEqual(meta['product_version'], '0.2.0')
+        self.assertEqual(meta['product_version'], '0.2.1')
         self.assertEqual(meta['toolkit_version'], '1.3.0')
         self.assertEqual(meta['bundle_id'], self.build['bundle_id'])
         tracker = self.project / 'Coordination/project_tracker.py'

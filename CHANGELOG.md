@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.1, local compatibility candidate, unreleased
+
+- Add opt-in Markdown content mode for existing Vaults: preserve untracked attachments,
+  non-Markdown artifacts and nested legacy coordination files without treating them
+  as root knowledge edits. Already accepted files remain managed.
+- Bind the choice to setup intent and versioned folder/client metadata; preserve
+  default behavior and refuse implicit conversion. Existing format2 folders require
+  a compatible client. This is not an authority-wide client-version handshake.
+- Public distribution remains v0.2.0 until a separate reviewed release. Whole-Vault
+  filesystem graph limits, real provider delivery and hosted operations remain separate.
+
+
 ## 0.2.0
 
 Normal public release with a direct agent-guided entry point: paste the setup

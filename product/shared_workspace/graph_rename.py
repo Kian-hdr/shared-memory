@@ -17,6 +17,7 @@ from .client import Client, _hash, _snapshot, _draft_coordination, _io_errors, _
 from .engine import PROTECTED, validate_path, validate_files, files_hash
 from .errors import ProductError
 from .path_safety import unsafe_ancestor
+from .content import manifest_mode, markdown_path
 
 COMMANDS = ('graph-rename-plan', 'graph-rename-draft', 'graph-rename-apply')
 BOUNDARY = 'Only selected-folder links are checked; outer-vault backlinks are unknown and are not read or updated.'
@@ -30,8 +31,9 @@ def digest(text):
     return hashlib.sha256(text.encode('utf-8')).hexdigest()
 
 
-def _guard_tree(root):
+def _guard_tree(root, content_mode='legacy', required=None):
     knowledge._absolute(root)
+    required = set(required or ())
     pending = [root]
     count = 0
     while pending:
@@ -46,6 +48,13 @@ def _guard_tree(root):
                 if entry.name.casefold() in PROTECTED:
                     continue
                 path = folder / entry.name
+                relative = path.relative_to(root).as_posix()
+                tracked = relative in required or any(p.startswith(relative + '/') for p in required)
+                if content_mode == 'markdown' and not tracked:
+                    if knowledge._private(entry.name) or any(part.casefold() == 'coordination' for part in Path(relative).parts):
+                        continue
+                    if not entry.is_dir(follow_symlinks=False) and not markdown_path(entry.name):
+                        continue
                 if knowledge._link_or_reparse(path):
                     fail('rename_unsafe', 'Selected paths cannot contain links or junctions.')
                 # Client scans non-reserved files. Refuse its broader scope rather
@@ -86,14 +95,14 @@ class RenameClient(Client):
         return path
 
     def _scan(self, required=None):
-        _guard_tree(self.root)
+        _guard_tree(self.root, self.content_mode, required)
         return super()._scan(required)
 
 
 def _client(client):
     knowledge._absolute(client.root)
     _private_guard(client.state)
-    return RenameClient(client.root, client.state, client.request)
+    return RenameClient(client.root, client.state, client.request, content_mode=client.content_mode)
 
 
 def _private_guard(path):
@@ -267,9 +276,12 @@ def _build(base, source, destination):
 
 
 def _clean(client, base, destination):
-    _guard_tree(client.root)
+    _guard_tree(client.root, client.content_mode, base['files'])
     graph = knowledge._Graph()
-    graph.collect(client.root, None)
+    if client.content_mode == 'markdown':
+        graph.collect(None, client._scan(base['files']))
+    else:
+        graph.collect(client.root, None)
     expected = {name: text for name, text in base['files'].items() if PurePosixPath(name).suffix.casefold() in knowledge.NOTE_EXTENSIONS}
     if graph.notes != expected:
         fail('rename_stale', 'Selected Markdown files differ from the accepted baseline; preserve/propose edits and refresh before planning.')
@@ -355,7 +367,7 @@ def apply(client, plan_id):
         base = client._base()
         if base['project_id'] != saved['project_id']:
             fail('project_mismatch', 'Rename plan belongs to another project.')
-        _guard_tree(client.root)
+        _guard_tree(client.root, client.content_mode, base['files'])
         target = _snapshot(client.request('snapshot', {}), base['project_id'])
         if target['revision'] <= saved['base_revision'] or target['files_hash'] != saved['result_files_hash']:
             fail('rename_not_accepted', 'Current accepted bytes do not exactly match this reviewed rename. Submit and accept first, or review a new plan.')
@@ -414,7 +426,7 @@ def dispatch(bundle, args):
     else:
         _private_guard(state / 'member.token')
     credential = private_path(args.session_token_file, root) if args.session_token_file is not None else None
-    client = Client(root, state / 'client', connect(state, credential))
+    client = Client(root, state / 'client', connect(state, credential), content_mode=manifest_mode(metadata))
     if args.command == 'graph-rename-plan':
         return plan(client, args.source, args.destination)
     if args.command == 'graph-rename-draft':

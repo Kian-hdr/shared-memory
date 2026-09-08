@@ -15,7 +15,7 @@ import zipfile
 
 
 ROOT = Path(__file__).resolve().parents[2]
-VERSION = '0.2.0'
+VERSION = '0.2.1'
 
 
 class ReleaseBuildTests(unittest.TestCase):

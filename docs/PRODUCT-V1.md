@@ -1,4 +1,9 @@
-# Shared Memory 0.2.0: operating guide
+# Shared Memory 0.2.1: local compatibility operating guide
+
+**Local candidate 0.2.1, not yet publicly released.** Reuse the exact privately installed
+package and source recorded in the project handoff for format-2 Markdown projects.
+The public acquisition instructions below still describe v0.2.0; that older runtime
+cannot operate an existing format-2 folder. See [Markdown mode](CONTENT-MODE.md).
 
 **A shared workspace for your team and its AI agents.**
 
@@ -178,6 +183,10 @@ The explicit `init` and `attach` interfaces below remain available for operators
 custom configuration. Ordinary users can stay in the setup-prompt flow.
 
 ## Owner setup
+
+The local development compatibility extension adds explicit
+[`--content-mode markdown`](CONTENT-MODE.md) for new selected projects. It is not
+part of published v0.2.0; default discovery and existing project formats are retained.
 
 For explicit `init`, choose one existing project folder. It can live inside a private
 vault; its parent, siblings and `.obsidian` settings are not the shared unit. Choose a fresh private

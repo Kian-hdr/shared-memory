@@ -96,7 +96,9 @@ def capabilities() -> dict:
                              "TEAM-04": "bounded_local_coverage_only",
                              **{f"TEAM-{number:02d}": "local_engine_contract_coverage_only" for number in (3, 5, 6, 7, 8, 9)},
                              "TEAM-10": "live_provider_not_run", "TEAM-11": "mixed_os_not_run"},
-        "release_status": "release", "stable_v1": False,
+        "content_modes": {"default": "legacy", "opt_in": "markdown", "markdown_manifest_format": 2,
+                          "required_accepted_paths_preserved": True, "authority_version_handshake": False},
+        "release_status": "local_candidate", "stable_v1": False,
         "python": {"minimum": "3.11", "rehearsal_baseline": "3.13"},
         "mixed_os_acceptance": "not_run", "hosted_remote_readiness": "unverified",
     }

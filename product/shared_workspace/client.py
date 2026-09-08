@@ -174,7 +174,9 @@ def _io_errors(method):
 
 
 class Client:
-    def __init__(self, project_root, state_dir, request):
+    def __init__(self, project_root, state_dir, request, *, content_mode='legacy'):
+        from .content import content_mode as validate_mode
+        self.content_mode = validate_mode(content_mode)
         self.root = _no_symlinks(project_root)
         self.state = _no_symlinks(state_dir)
         self.request = request
@@ -288,6 +290,7 @@ class Client:
     def _walk(self, required=None):
         """Inspect managed entries before descent; excluded state stays opaque."""
         from .knowledge import PRIVATE, PRIVATE_FILES
+        from .content import markdown_path
         required = set(required or ())
         excluded = getattr(self, '_excluded', [])
         _no_symlinks(self.root)
@@ -298,7 +301,9 @@ class Client:
                 relative = child.relative_to(self.root).as_posix()
                 if name.casefold() in PROTECTED:
                     dirs.remove(name)
-                elif ((name.startswith('.') or name.casefold() in PRIVATE)
+                elif ((name.startswith('.') or name.casefold() in PRIVATE or
+                       (self.content_mode == 'markdown' and
+                        any(part.casefold() == 'coordination' for part in Path(relative).parts)))
                       and not any(p.startswith(relative + '/') for p in required)):
                     dirs.remove(name)
                     excluded.append({'path': relative, 'reason': 'untracked-private-directory'})
@@ -308,6 +313,11 @@ class Client:
                        and not name.startswith('.shared-memory-write-')]
             for name in list(managed):
                 relative = (Path(directory) / name).relative_to(self.root).as_posix()
+                if (self.content_mode == 'markdown' and relative not in required and
+                        (not markdown_path(name) or any(part.casefold() == 'coordination' for part in Path(relative).parts[:-1]))):
+                    managed.remove(name)
+                    excluded.append({'path': relative, 'reason': 'untracked-non-markdown-or-legacy-file'})
+                    continue
                 if (relative not in required and
                         (name.startswith('.') or name.casefold() in PRIVATE | PRIVATE_FILES)):
                     managed.remove(name)
@@ -344,13 +354,17 @@ class Client:
         if value is None:
             _error('not_attached', 'Attach this client before using it.', 4)
         saved_root = self._load('client.json')
-        if saved_root.get('schema_version') != 1:
-            _error('client_state', 'Unknown client state schema version.')
+        self._check_mode(saved_root)
         if saved_root.get('project_id') != value.get('project_id'):
             _error('project_mismatch', 'Private client project identity is inconsistent.')
         if saved_root.get('project_root') != str(self.root):
             _error('client_root_mismatch', 'Use a separate private client state directory for this local project path.')
         return _snapshot(value)
+
+    def _check_mode(self, config):
+        from .content import client_mode
+        if client_mode(config) != self.content_mode:
+            _error('content_mode_mismatch', 'Private client and project content modes disagree; no automatic conversion is supported.')
 
     @staticmethod
     def _changes(before, after):
@@ -430,7 +444,8 @@ class Client:
         if journal.get('schema_version') != 1:
             _error('client_state', 'Unknown materialization journal version.')
         config = self._load('client.json')
-        if config.get('schema_version') != 1 or config.get('project_root') != str(self.root):
+        self._check_mode(config)
+        if config.get('project_root') != str(self.root):
             _error('client_state', 'Materialization belongs to incompatible private client state.')
         target = _snapshot(journal.get('target'), config.get('project_id'))
         base = _snapshot(journal.get('base'), target['project_id'])
@@ -526,12 +541,16 @@ class Client:
         with self._locked(create=True):
             existing = self._load('snapshot.json', optional=True)
             config = self._load('client.json', optional=True)
+            if config:
+                self._check_mode(config)
             if config and (config.get('project_root') != str(self.root) or
                            config.get('project_id') != expected_project_id):
                 _error('client_root_mismatch', 'Private state already belongs to another local project.')
-            self._save('client.json', {'schema_version': 1, 'project_root': str(self.root),
-                                       'project_id': expected_project_id})
-            self._resume()
+            saved_config = {'schema_version': 1, 'project_root': str(self.root), 'project_id': expected_project_id}
+            if self.content_mode == 'markdown':
+                saved_config.update(schema_version=2, content_mode='markdown')
+            self._save('client.json', saved_config)
+            drafts = self._resume()
             existing = self._load('snapshot.json', optional=True)
             if existing:
                 base = _snapshot(existing, expected_project_id)
@@ -541,7 +560,7 @@ class Client:
                 local = self._scan(target['files'])
                 matched_paths = {k: v for k, v in target['files'].items() if k in local}
                 base = dict(target, files=matched_paths, files_hash=_hash(matched_paths))
-            drafts = self._materialize(target, base)
+            drafts += self._materialize(target, base)
             return dict(self._receipt(), drafts=sorted(set(drafts)))
 
     @_io_errors

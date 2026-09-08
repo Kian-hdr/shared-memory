@@ -70,7 +70,8 @@ def dispatch(bundle, args):
     status = transport('status', {'limit': 1})
     if status.get('project_id') != metadata['project_id']:
         raise ProductError(3, 'project_mismatch', 'The authenticated coordinator belongs to another project.')
-    client = Client(root, state / 'client', transport)
+    from .content import manifest_mode
+    client = Client(root, state / 'client', transport, content_mode=manifest_mode(metadata))
     previous = client.accepted_snapshot()
     backend = _backend(args, root, state, metadata['provider'])
     try:

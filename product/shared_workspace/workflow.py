@@ -18,6 +18,7 @@ from .errors import ProductError
 from .path_safety import absolute_path, unsafe_ancestor, is_link_or_reparse
 from .providers import PROVIDERS, capabilities, verify_receipt
 from .transport import LocalTransport, HTTPTransport, read_token, serve
+from .content import CONTENT_MODES, content_mode, manifest_mode, markdown_path, client_mode
 
 MANIFEST = ".shared-memory.json"
 TEAM_COMMANDS = ("init", "attach", "refresh", "draft", "submit", "receipt", "team-status",
@@ -34,6 +35,7 @@ def add_commands(commands):
     init.add_argument("--provider", choices=PROVIDERS, default="local")
     init.add_argument("--include", action="append", help="Explicit relative UTF8 file; existing root AGENTS/Home/README accompany the import; default all project Markdown outside protected directories")
     init.add_argument("--coordination-file", help="Explicit schema 2 person/agent identity and policy JSON; omission preserves schema 1")
+    init.add_argument('--content-mode', choices=CONTENT_MODES, help='Opt in to Markdown-only discovery; omission preserves legacy discovery')
     attach = commands.add_parser("attach", help="Attach a recipient to an existing authoritative project")
     attach.add_argument("project")
     attach.add_argument("--state-dir", required=True)
@@ -44,6 +46,7 @@ def add_commands(commands):
     attach.add_argument("--token-file", required=True)
     attach.add_argument("--ca-file")
     attach.add_argument("--provider", choices=PROVIDERS, default="local")
+    attach.add_argument('--content-mode', choices=CONTENT_MODES, help='Must match the existing project content mode; pass markdown for a new local copy without its manifest')
     for name in ("refresh", "draft", "submit", "receipt", "team-status", "coord", "member-add", "team-prompt", "provider-check", "promote-draft", "context"):
         command = commands.add_parser(name)
         command.add_argument("project")
@@ -131,7 +134,7 @@ def selected_root(value):
     return path
 
 
-def initial_files(root, includes):
+def initial_files(root, includes, mode='legacy'):
     from .knowledge import PRIVATE, PRIVATE_FILES
     if includes:
         selected = [root / name for name in includes]
@@ -142,13 +145,15 @@ def initial_files(root, includes):
         for directory, dirs, names in os.walk(root, followlinks=False):
             if unsafe_ancestor(directory) is not None:
                 raise ProductError(3, "target_invalid", "Included paths cannot traverse links or reparse points.")
-            dirs[:] = [name for name in dirs if not name.startswith('.') and name != 'Coordination'
+            dirs[:] = [name for name in dirs if not name.startswith('.') and
+                       (name.casefold() != 'coordination' if mode == 'markdown' else name != 'Coordination')
                        and name.casefold() not in PRIVATE]
             for name in dirs:
                 if unsafe_ancestor(Path(directory) / name) is not None:
                     raise ProductError(3, "target_invalid", "Included paths cannot traverse links or reparse points.")
             selected.extend(Path(directory) / name for name in names
-                            if (name.casefold() if os.name == 'nt' else name).endswith('.md')
+                            if (markdown_path(name) if mode == 'markdown' else
+                                (name.casefold() if os.name == 'nt' else name).endswith('.md'))
                             and not name.startswith('.')
                             and name.casefold() not in PRIVATE | PRIVATE_FILES)
     files = {}
@@ -156,12 +161,14 @@ def initial_files(root, includes):
         if not path.is_relative_to(root):
             raise ProductError(3, "target_invalid", "Included files must remain inside the selected project.")
         relative = path.relative_to(root)
+        if mode == 'markdown' and not markdown_path(relative.as_posix()):
+            raise ProductError(3, 'target_invalid', 'Markdown content mode imports only .md and .markdown files.')
         if (any(part.casefold() in PRIVATE for part in relative.parts)
                 or relative.name.casefold() in PRIVATE_FILES):
             if includes:
                 raise ProductError(3, "target_invalid", "Private runtime and credential paths cannot be imported as knowledge.")
             continue
-        if any(part.startswith(".") or part == "Coordination" for part in relative.parts):
+        if any(part.startswith(".") or (part.casefold() == 'coordination' if mode == 'markdown' else part == 'Coordination') for part in relative.parts):
             if includes:
                 raise ProductError(3, "target_invalid", "Protected hidden/legacy state cannot be imported as knowledge.")
             continue
@@ -186,26 +193,29 @@ def _foundation_files(root):
 
 def project_manifest(root):
     data = json_file(root / MANIFEST)
-    if (not isinstance(data, dict) or data.get("format_version") != 1 or data.get("protocol") != 1
+    if (not isinstance(data, dict) or data.get("protocol") != 1
             or data.get("provider") not in PROVIDERS):
         raise ProductError(3, "project_invalid", "Unsupported Shared Memory project metadata.")
+    manifest_mode(data)
     return data
 
 
-def write_manifest(root, project_id, provider):
+def write_manifest(root, project_id, provider, mode='legacy'):
     metadata = {"format_version": 1, "protocol": 1, "project_id": project_id,
                 "product_version": PRODUCT_VERSION, "provider": provider}
+    if content_mode(mode) == 'markdown':
+        metadata.update(format_version=2, content_mode='markdown')
     path = root / MANIFEST
     if path.exists() or is_link_or_reparse(path):
         current = project_manifest(root)
-        if current["project_id"] != project_id or current["provider"] != provider:
+        if current["project_id"] != project_id or current["provider"] != provider or manifest_mode(current) != mode:
             raise ProductError(3, "project_mismatch", "Existing project identity/provider cannot be replaced while joining.")
         return current
     try:
         _publish_setup_json(path, metadata)
     except FileExistsError:
         current = project_manifest(root)
-        if current["project_id"] != project_id or current["provider"] != provider:
+        if current["project_id"] != project_id or current["provider"] != provider or manifest_mode(current) != mode:
             raise ProductError(3, "project_mismatch", "Another setup reserved this selected folder for a different project.")
         return current
     return metadata
@@ -311,6 +321,8 @@ def _setup_lock(state):
 
 def _setup_binding(root, args):
     binding = {"command": args.command, "project_root": str(root), "provider": args.provider}
+    if content_mode(getattr(args, 'content_mode', None)) == 'markdown':
+        binding['content_mode'] = 'markdown'
     if args.command == "init":
         binding.update(mode=args.mode, person=args.person, actor=args.actor, agent=args.agent,
                        purpose=args.purpose, include=args.include)
@@ -353,12 +365,14 @@ def _check_setup_state(root, state, intent, binding):
         raise ProductError(3, "setup_invalid", "Private setup credential is invalid.")
     if binding["command"] == "attach" and read_token(binding["token_file"]) != token:
         raise ProductError(3, "setup_mismatch", "Joining credential changed; setup will not replace its original membership.")
-    for name in (".workspace-project.json", "Coordination"):
+    mode = content_mode(binding.get('content_mode'))
+    for name in ('.workspace-project.json', 'Coordination'):
         if (root / name).exists() or (root / name).is_symlink():
             raise ProductError(4, "already_configured", "Legacy state requires reviewed migration; setup cannot take it over.")
     if (root / MANIFEST).exists() or (root / MANIFEST).is_symlink():
         metadata = project_manifest(root)
-        if metadata["project_id"] != intent["project_id"] or metadata["provider"] != binding["provider"]:
+        if (metadata["project_id"] != intent["project_id"] or metadata["provider"] != binding["provider"]
+                or manifest_mode(metadata) != mode):
             raise ProductError(3, "project_mismatch", "Existing folder identity differs from this setup intent.")
     token_path = private_path(state / "member.token")
     if token_path.exists() and read_token(token_path) != token:
@@ -369,6 +383,8 @@ def _check_setup_state(root, state, intent, binding):
     client_config = private_path(state / "client" / "client.json")
     if client_config.exists():
         config = json_file(client_config)
+        if client_mode(config) != mode:
+            raise ProductError(3, 'content_mode_mismatch', 'Existing client content mode cannot be changed during setup.')
         if config.get("project_id") != intent["project_id"] or config.get("project_root") != str(root):
             raise ProductError(3, "setup_mismatch", "Existing client belongs to a different project or local folder.")
 
@@ -432,7 +448,23 @@ def _setup(root, state, args):
     from .engine import files_hash, validate_files, identifier, text
     # Reject managed junctions before setup creates its lock, intent, credential,
     # authority or manifest. This inventory reads no project file contents.
-    for _ in Client(root, state / 'client', None)._walk():
+    # Determine scope from an existing portable manifest when joining; it never
+    # silently overrides an explicitly selected mode or an immutable intent.
+    requested_mode = getattr(args, 'content_mode', None)
+    mode = content_mode(requested_mode)
+    if requested_mode is None and (state / SETUP_INTENT).exists():
+        saved = json_file(private_path(state / SETUP_INTENT))
+        if not isinstance(saved, dict) or not isinstance(saved.get('binding'), dict):
+            raise ProductError(3, 'setup_invalid', 'Private setup intent must contain a complete binding object.')
+        mode = content_mode(saved.get('binding', {}).get('content_mode'))
+    if (root / MANIFEST).exists():
+        existing_mode = manifest_mode(project_manifest(root))
+        if requested_mode is not None and mode != existing_mode:
+            raise ProductError(3, 'content_mode_mismatch', 'Existing project content mode cannot be overridden.')
+        mode = existing_mode
+    args.content_mode = mode
+    legacy_names = ('.workspace-project.json', 'Coordination')
+    for _ in Client(root, state / 'client', None, content_mode=mode)._walk():
         pass
     if args.command == "init":
         # Reject uncorrectable owner/intent values before publishing an immutable
@@ -451,7 +483,7 @@ def _setup(root, state, args):
     if not (state / SETUP_INTENT).exists():
         if state.exists() and any(p.name != SETUP_LOCK and not p.name.startswith(".setup-write-") for p in state.iterdir()):
             raise ProductError(4, "state_exists", "Existing private state has no matching setup intent; preserve its existing workflow.")
-        if any((root / name).exists() or (root / name).is_symlink() for name in (".workspace-project.json", "Coordination")):
+        if any((root / name).exists() or (root / name).is_symlink() for name in legacy_names):
             raise ProductError(4, "already_configured", "Legacy project state requires a reviewed migration.")
         if args.command == "init":
             if (root / MANIFEST).exists() or (root / MANIFEST).is_symlink():
@@ -474,12 +506,12 @@ def _setup(root, state, args):
             unknown = [p for p in state.iterdir() if p.name != SETUP_LOCK and not p.name.startswith(".setup-write-")]
             if unknown:
                 raise ProductError(4, "state_exists", "Existing private state has no matching setup intent; preserve it and use its existing workflow.")
-            if any((root / name).exists() or (root / name).is_symlink() for name in (".workspace-project.json", "Coordination")):
+            if any((root / name).exists() or (root / name).is_symlink() for name in legacy_names):
                 raise ProductError(4, "already_configured", "Legacy project state requires a reviewed migration.")
             if args.command == "init":
                 if (root / MANIFEST).exists() or (root / MANIFEST).is_symlink():
                     raise ProductError(4, "already_configured", "Existing project cannot be initialized by a new setup intent.")
-                files = initial_files(root, args.include)
+                files = initial_files(root, args.include, mode)
                 foundations = _foundation_files(root)
                 for name in list(files):
                     if name.casefold() in {existing.casefold() for existing in foundations} and name not in foundations:
@@ -535,8 +567,8 @@ def _setup(root, state, args):
             raise ProductError(3, "setup_mismatch", "Coordinator history differs from the verified setup snapshot.")
         # Reserve this exact root identity before materialization. Separate state
         # directories cannot initialize different identities into the same root.
-        write_manifest(root, intent["project_id"], args.provider)
-        receipt = Client(root, state / "client", request).attach(intent["project_id"])
+        write_manifest(root, intent["project_id"], args.provider, mode)
+        receipt = Client(root, state / "client", request, content_mode=mode).attach(intent["project_id"])
         if args.command == "init":
             return {"project_id": intent["project_id"], "receipt": receipt, "mode": args.mode, "provider": capabilities(args.provider),
                     "readiness": receipt["readiness"] if args.mode == "local" and args.provider == "local" else "partial",
@@ -580,7 +612,7 @@ def dispatch(bundle, args):
                 raise ProductError(3, "project_mismatch", "Connection points to a different project's authority.")
             checked = True
         return transport(operation, payload)
-    client = Client(root, state / "client", request)
+    client = Client(root, state / "client", request, content_mode=manifest_mode(metadata))
     if args.command == "receipt":
         return client.receipt()
     if args.command == "refresh":

@@ -12,6 +12,7 @@ import sys
 from . import workflow
 from .errors import ProductError
 from .transport import read_token
+from .content import CONTENT_MODES, content_mode, manifest_mode
 
 COMMANDS = ('setup',)
 IDENTITY = ('person', 'actor', 'agent', 'purpose')
@@ -25,6 +26,7 @@ def add_commands(commands):
     for name in IDENTITY:
         setup.add_argument('--' + name)
     setup.add_argument('--provider', choices=workflow.PROVIDERS)
+    setup.add_argument('--content-mode', choices=CONTENT_MODES, help='Opt in to Markdown-only discovery for a new project; existing mode is retained')
     setup.add_argument('--expected-project-id')
     route = setup.add_mutually_exclusive_group()
     route.add_argument('--endpoint')
@@ -65,11 +67,13 @@ def _resume_arguments(args, root, state, intent):
     binding = intent['binding']
     if binding.get('command') not in {'init', 'attach'} or binding.get('project_root') != str(root):
         mismatch('project')
-    for field in (*IDENTITY, 'provider', *JOIN):
+    for field in (*IDENTITY, 'provider', 'content_mode', *JOIN):
         supplied = getattr(args, field)
         if supplied is None:
             continue
         stored = intent.get('project_id') if field == 'expected_project_id' else binding.get(field)
+        if field == 'content_mode':
+            stored = content_mode(stored)
         if _value(field, supplied, root) != stored:
             mismatch(field)
     values = dict(binding)
@@ -96,6 +100,7 @@ def _existing_arguments(args, root, state, metadata):
             raise ProductError(3, 'setup_identity_unverified',
                                'This existing installation has no setup intent. Omit identity overrides to keep its authenticated membership.')
     expected = {'provider': metadata['provider'], 'expected_project_id': metadata['project_id'],
+                'content_mode': manifest_mode(metadata),
                 'endpoint': connection.get('endpoint'), 'database': connection.get('database'),
                 'ca_file': connection.get('ca_file')}
     for field, stored in expected.items():
@@ -111,6 +116,9 @@ def _existing_arguments(args, root, state, metadata):
 def _fresh_arguments(args, root, state, metadata):
     joining = metadata is not None or any(getattr(args, name) is not None for name in JOIN)
     provider = args.provider or (metadata['provider'] if metadata else 'local')
+    mode = content_mode(args.content_mode) if args.content_mode is not None else (manifest_mode(metadata) if metadata else 'legacy')
+    if metadata is not None and mode != manifest_mode(metadata):
+        mismatch('content_mode')
     if joining:
         identity = args.expected_project_id or (metadata['project_id'] if metadata else None)
         missing = []
@@ -129,7 +137,7 @@ def _fresh_arguments(args, root, state, metadata):
                                'Joining uses the identity issued with your membership token. Omit owner identity fields.')
         return argparse.Namespace(command='attach', project=str(root), state_dir=str(state),
                                   expected_project_id=identity, endpoint=args.endpoint, database=args.database,
-                                  token_file=args.token_file, ca_file=args.ca_file, provider=provider)
+                                  token_file=args.token_file, ca_file=args.ca_file, provider=provider, content_mode=mode)
     try:
         person = getpass.getuser()
     except (KeyError, OSError):
@@ -138,11 +146,11 @@ def _fresh_arguments(args, root, state, metadata):
                               provider=provider, person=args.person or person,
                               actor=args.actor or 'local-' + secrets.token_hex(8), agent=args.agent or 'Local agent',
                               purpose=args.purpose or 'Shared work in ' + root.name, include=None,
-                              coordination_file=None, coordination_config=None)
+                              coordination_file=None, coordination_config=None, content_mode=mode)
 
 
 def dispatch(bundle, args):
-    for field in ('state_dir', *IDENTITY, 'provider', *JOIN):
+    for field in ('state_dir', *IDENTITY, 'provider', 'content_mode', *JOIN):
         value = getattr(args, field)
         if value is not None and not value.strip():
             raise ProductError(2, 'usage_error', '--' + field.replace('_', '-') + ' cannot be empty.')
@@ -182,6 +190,7 @@ def dispatch(bundle, args):
                    connection.get('database') == str(state / 'coordinator.sqlite3'))
     data = {'route': route, 'readiness': 'ready' if ready else 'partial',
             'project_id': current['project_id'], 'state_dir': str(state),
+            'content_mode': manifest_mode(metadata),
             'actor': getattr(selected, 'actor', None),
             'actor_source': 'saved_owner_identity' if hasattr(selected, 'actor') else 'issued_membership_not_exposed_by_status',
             'receipt': current, 'authority_revision': status['revision'],

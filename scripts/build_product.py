@@ -11,7 +11,7 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PRODUCT_VERSION = "0.2.0"
+PRODUCT_VERSION = "0.2.1"
 TOOLKIT_VERSION = "1.3.0"
 BOOTSTRAP = r'''import hashlib
 import json
@@ -20,7 +20,7 @@ import zipfile
 
 
 def fail(code, message, exit_code):
-    print(json.dumps({"schema_version": 1, "product_version": "0.2.0",
+    print(json.dumps({"schema_version": 1, "product_version": "0.2.1",
                       "command": sys.argv[1] if len(sys.argv) > 1 else "",
                       "ok": False, "code": code, "message": message,
                       "data": {}, "warnings": []}))
@@ -87,7 +87,7 @@ def build(output: Path, *, source_files: dict[str, bytes] | None = None,
                 raise ValueError("Skill symlinks are not package inputs.")
             if source.is_file():
                 inputs[source.relative_to(ROOT).as_posix()] = source.read_bytes()
-        for name in ("LICENSE", "docs/PRODUCT-V1.md", "docs/KNOWLEDGE-GRAPH.md", "requirements-server.txt"):
+        for name in ("LICENSE", "docs/PRODUCT-V1.md", "docs/KNOWLEDGE-GRAPH.md", "docs/CONTENT-MODE.md", "requirements-server.txt"):
             inputs[name] = (ROOT / name).read_bytes()
     else:
         for name, data in source_files.items():
@@ -105,7 +105,8 @@ def build(output: Path, *, source_files: dict[str, bytes] | None = None,
             if "__pycache__" not in name.split("/") and Path(name).suffix not in {".pyc", ".pyo"}:
                 payload["bundle/" + name] = data
     for destination, source in (("LICENSE", "LICENSE"), ("PRODUCT-GUIDE.md", "docs/PRODUCT-V1.md"),
-            ("KNOWLEDGE-GRAPH.md", "docs/KNOWLEDGE-GRAPH.md"), ("requirements-server.txt", "requirements-server.txt")):
+            ("KNOWLEDGE-GRAPH.md", "docs/KNOWLEDGE-GRAPH.md"), ("CONTENT-MODE.md", "docs/CONTENT-MODE.md"),
+            ("requirements-server.txt", "requirements-server.txt")):
         payload[destination] = inputs[source]
     files = {name: hashlib.sha256(data).hexdigest() for name, data in sorted(payload.items())}
     bundle_id = hashlib.sha256(json.dumps(files, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
