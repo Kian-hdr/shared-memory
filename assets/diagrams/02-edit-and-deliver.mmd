@@ -1,0 +1,12 @@
+flowchart TB
+  accTitle: Save locally, capture history, reconcile arrivals
+  accDescr: Direct editing requires no approval queue. Saving is local. Sync records history; the separately configured provider delivers files. Received history is reconciled only when parents are present, with conflicts retained.
+  E["Read → edit → save<br/>Person or agent · offline is allowed"] -->|"local bytes saved"| S["Run sync<br/>Capture changes + reconcile visible history"]
+  S -->|"immutable JSON events"| H["Portable project history<br/>.shared-memory/events/"]
+  H -->|"configured provider delivers"| R["Other copy: run sync after arrival"]
+  R -->|"parents available"| C["Compatible changes merge<br/>Competing versions remain for resolution"]
+  R -->|"parent events missing"| W["Defer reconciliation<br/>Keep history; wait for missing parents"]
+  classDef local fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e;
+  classDef caution fill:#fff7ed,stroke:#c2410c,color:#7c2d12;
+  class E,S,H,R local;
+  class W,C caution;

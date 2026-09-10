@@ -1,3 +1,40 @@
+# Shared Memory acceptance scenarios
+
+## Direct-folder workflow, 0.3.0
+
+Use synthetic nonconfidential content for acceptance exercises, independently from
+ordinary onboarding. These scenarios are evidence collection, not a requirement
+that users create a disposable project before working in their own folder.
+
+1. Set up one selected folder with preserved parent/settings/attachments, then join
+   its delivered format-3 copy on another computer using independent private state.
+2. Save useful edits directly while offline. Capture locally, reconnect the chosen
+   provider and compare actual note bytes and visible history on both computers.
+3. Make compatible edits to different lines and conflicting edits to the same
+   content. Verify convergence only where supported, and retain every unresolved
+   competing version. Ask a different authorized editor to resolve with evidence.
+4. Exercise edits made outside the agent and provider-generated conflict copies.
+   Preserve local-only copies before cleanup and distinguish the observer label
+   from the original human author. Test the provider's actual ignore/hidden-file rules.
+5. Test explicit deletion/rename, missing downloads, interrupted application and
+   restart. Verify historical recovery and review backlinks separately; rename does
+   not rewrite them automatically.
+6. Verify local read-only refusal and actual provider read-only/revoked rights.
+   A writable local file or old coordinator roster is not proof of provider access.
+7. Record package/hash, client/OS versions, exact outcomes and limits. Separate local
+   deterministic fixtures from real provider transport and independent human/device
+   use. Do not claim recovery of bytes overwritten before they were captured.
+
+See [commands](PRODUCT-V1.md), [provider choices](PROVIDERS.md),
+[diagrams](DIAGRAMS.md) and [validation](../VALIDATION.md).
+
+## Historical coordinator acceptance runbook
+
+The retained procedure below applies only to the earlier coordinator/session design.
+Its integration owner and approval flow are not requirements for direct-folder use.
+Its dated results and unrun gates remain historical rather than being silently
+converted into folder-mode evidence.
+
 # Shared Memory real-device acceptance runbook
 
 Prepared 2026-09-08. **The full three-participant/provider procedure has not been
@@ -45,7 +82,7 @@ HTTPS receipt and storage-provider receipt are different observations.
 2. Owner uses `init PROJECT --state-dir PRIVATE_STATE --person PERSON --actor ACTOR
    --agent AGENT --purpose PURPOSE --mode team --provider PROVIDER
    --coordination-file PRIVATE_CONFIG`. Use the schema-2 person/agent/policy config
-   in the [operating guide](PRODUCT-V1.md#session-based-coordination). Record the
+   in the [operating guide](COORDINATOR-WORKFLOW.md#session-based-coordination). Record the
    returned UUID, accepted revision/hash and actual package identity.
 3. The authorized host exposes the actual packaged coordinator with verified TLS,
    preserving its database locally. Use the operating guide's `serve` procedure.
@@ -71,7 +108,7 @@ HTTPS receipt and storage-provider receipt are different observations.
 Use `coord PROJECT --state-dir PRIVATE_STATE OPERATION --payload-file PRIVATE_JSON`
 with the authenticated session and schema-2 payloads in the candidate's
 [engine contract](../product/ENGINE-CONTRACT.md) and
-[operating guide](PRODUCT-V1.md#session-based-coordination). Save each command's JSON
+[operating guide](COORDINATOR-WORKFLOW.md#session-based-coordination). Save each command's JSON
 output, exit code and time without credential values.
 
 - Plan distinct outcomes and declared note targets with criteria, an authorized
@@ -160,7 +197,7 @@ Linux vendor route remains a gap; another route does not establish vendor parity
 
 ### Explicit Google Drive revision delivery
 
-Use the [delivery procedure](PRODUCT-V1.md#explicit-revision-delivery-development-scope)
+Use the [delivery procedure](COORDINATOR-WORKFLOW.md#explicit-revision-delivery-development-scope)
 with an installed reviewed rclone executable, each participant's already authorized
 private configuration, reviewed folder binding and `--provider google-drive`.
 Record account type and adapter/rclone versions without account IDs or locators.

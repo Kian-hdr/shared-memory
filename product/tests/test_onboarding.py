@@ -53,6 +53,7 @@ class OnboardingTests(unittest.TestCase):
             path.write_bytes(content)
 
     def cli(self, command, *arguments, expected=0, env=None):
+        arguments = (*arguments, '--workflow', 'coordinator') if command == 'setup' else arguments
         result = subprocess.run([sys.executable, str(self.package), command, *map(str, arguments)],
                                 capture_output=True, text=True, timeout=30, env=env)
         self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
@@ -223,7 +224,7 @@ class OnboardingTests(unittest.TestCase):
         self.assertEqual(inventory(self.root), before)
 
     def test_interrupted_setup_resumes_without_reentering_original_identity(self):
-        arguments = ['setup', str(self.project), '--state-dir', str(self.state),
+        arguments = ['setup', str(self.project), '--workflow', 'coordinator', '--state-dir', str(self.state),
                      '--actor', 'interrupted-owner', '--person', 'Original Person']
         crashed = subprocess.run([sys.executable, str(REPO / 'product/tests/test_setup_recovery.py'),
                                   '--crash-worker', str(self.package), 'after-credential', json.dumps(arguments)],

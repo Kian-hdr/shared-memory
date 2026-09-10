@@ -13,8 +13,9 @@ from pathlib import Path
 
 from .errors import ProductError
 
-PROVIDERS = ("local", "self-hosted", "google-drive", "onedrive", "icloud")
+PROVIDERS = ("local", "self-hosted", "google-drive", "onedrive", "icloud", "nextcloud")
 SOURCES = {
+    "nextcloud": "https://docs.nextcloud.com/server/stable/user_manual/en/desktop/index.html",
     "google-drive": "https://support.google.com/drive/answer/2375082",
     "onedrive": "https://support.microsoft.com/en-US/onedrive/onedrive-system-requirements",
     "icloud": "https://support.apple.com/en-us/108922",
@@ -25,7 +26,7 @@ def capabilities(provider, account_type="unspecified", system=None):
     if provider not in PROVIDERS:
         raise ProductError(3, "provider_unknown", "Select a documented provider route.")
     system = system or platform.system()
-    local_route = provider in {"local", "self-hosted"} or system in {"Darwin", "Windows"}
+    local_route = provider in {"local", "self-hosted", "nextcloud"} or system in {"Darwin", "Windows"}
     return {"provider": provider, "account_type": account_type, "os": system,
             "route": "authorized_local_folder" if local_route else "unsupported_vendor_desktop_route",
             "adapter": "read_only_snapshot_receipt",

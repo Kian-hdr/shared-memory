@@ -53,9 +53,9 @@ jobs:
         run: python scripts/build_product.py --output "${{ runner.temp }}/shared-memory.pyz"
       - name: Inspect versioned package guide
         run: python "${{ runner.temp }}/shared-memory.pyz" guide
-      - name: Rehearse scoped sessions and recipient handoff
+      - name: Rehearse historical scoped sessions and recipient handoff
         run: python scripts/rehearse_coordination.py --package "${{ runner.temp }}/shared-memory.pyz" --output "${{ runner.temp }}/coordination-rehearsal"
-      - name: Rehearse reviewed selected-folder rename
+      - name: Rehearse historical coordinator note rename
         run: python scripts/rehearse_graph_rename.py --package "${{ runner.temp }}/shared-memory.pyz" --output "${{ runner.temp }}/graph-rename-rehearsal"
       - name: Build complete clean-source distribution
         run: python scripts/build_release.py --output "${{ runner.temp }}/shared-memory-release"
@@ -82,7 +82,7 @@ jobs:
         run: |
           package_hash=$(python -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$RUNNER_TEMP/shared-memory.pyz")
           python scripts/rehearse_release_faults.py --package "$RUNNER_TEMP/shared-memory.pyz" --sha256 "$package_hash" --output "$RUNNER_TEMP/release-faults"
-      - name: Rehearse normal owner setup and own-member HTTPS join
+      - name: Rehearse historical coordinator setup and own-member HTTPS join
         run: python scripts/rehearse_team.py --package "${{ runner.temp }}/shared-memory.pyz" --output "${{ runner.temp }}/normal-setup"
       - name: Preserve sanitized fault report only
         if: always()

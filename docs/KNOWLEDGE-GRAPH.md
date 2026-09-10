@@ -1,5 +1,10 @@
 # Knowledge graph for one shared project
 
+For normal 0.3.0 folder mode, use the read-only `graph PROJECT` command and review
+links after direct edits. The `--accepted` and `graph-rename-*` procedures below
+belong to the explicitly retained coordinator workflow. Folder `rename` records
+a path move but does not update Markdown/wiki backlinks.
+
 Shared Memory builds a read-only graph from readable Markdown notes and their
 explicit links. Use it to follow a project into its knowledge, decisions,
 evidence and work records, or to find a broken reference before publishing a
@@ -189,7 +194,7 @@ URLs, credentials in those URLs and absolute host paths are not exported. This
 does not make the report public: note titles, paths, links and metadata can still
 contain project information. Keep reports within the project's disclosure rules.
 
-## Reviewed selected-folder note rename
+## Historical coordinator reviewed note rename
 
 The separate `graph-rename-*` commands rename one accepted Markdown note and
 update supported selected-folder references through ordinary proposals. They do

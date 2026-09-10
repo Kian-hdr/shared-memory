@@ -1,3 +1,5 @@
+> **Version scope:** Historical 0.2.1 coordinator content-mode extension. Normal 0.3.0 folder workflow already uses Markdown discovery and format 3; use [the current guide](PRODUCT-V1.md). This document is retained for older format-2 projects.
+
 # Optional Markdown content mode
 
 This compatibility extension is a local development candidate. The published

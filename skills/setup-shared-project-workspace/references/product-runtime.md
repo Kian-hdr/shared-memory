@@ -1,60 +1,58 @@
-# Shared Memory authoritative product route
+# Product runtime and format routing
 
-Use this route when the user requests the Shared Memory product or supplies a
-reviewed product `.pyz`, rather than the historical advisory Markdown tracker.
-Do not silently substitute a legacy toolkit for an unavailable product package.
+Shared Memory 0.3.0 defaults to direct shared-folder editing. Use Python 3.11+ and
+an exact verified `.pyz`. The version-specific release is
+[v0.3.0](https://github.com/Kian-hdr/shared-memory/releases/tag/v0.3.0); execute
+`shared-memory-0.3.0.pyz` only when actually supplied/present and verified against
+external `SHA256SUMS`. An explicitly provided reviewed candidate is separate from
+a published release. Verify before execution, then read `version`, `capabilities`
+and `guide`. Install it in private immutable tools storage using `install-package`.
+This skill is not the runtime and must not silently substitute the advisory tracker.
 
-The release is **v0.2.0**, with runtime version **0.2.0**. Select
-`shared-memory-0.2.0.pyz` and its entry in external `SHA256SUMS` only when
-present on the [release page](https://github.com/Kian-hdr/shared-memory/releases/tag/v0.2.0).
-Verify downloaded bytes before execution, then run `version`, `capabilities` and
-`guide`. Read the operating guide bundled with that exact artifact. If assets are
-absent, ask for the intended reviewed package/source; do not run arbitrary latest
-source. The package contains the engine; this skill folder alone does not.
+## Normal folder workflow
 
-Use Python 3.11+ for the product. `install-package` retains exact verified archives
-under a private tools directory and returns the immutable installed path; use that
-path for later commands. It does not install Python, add a global command or deploy
-a server. The optional complete skill archive must preserve its directory structure
-and any existing installation during review.
+Run `setup PROJECT` on the actual existing folder. It defaults to `--workflow folder`
+and Markdown discovery. It discovers a new, joined or resumed format-3 project;
+optional inputs include `--state-dir`, `--actor`, `--person`, `--agent`,
+`--expected-project-id`, `--provider` and `--read-only`. Providers are local,
+Google Drive, iCloud, OneDrive, Nextcloud or an explicitly selected self-hosted route.
+These flags record intent and local binding, not account authentication or receipt.
 
-- Use `setup PROJECT` for normal onboarding. Discover compatible Python and the
-  selected folder, install missing prerequisites within authorization, then inspect
-  `setup --help` and run the command. It selects private local state, creates a new
-  local owner or resumes the original saved binding, and verifies an authenticated
-  current receipt. Existing team folders require the recipient's own membership
-  and authority access; never fall back to a new local authority. Re-running setup
-  recovers interrupted setup and materialization, preserving drafts. Missing accepted
-  history, changed identity and credentials require specific recovery rather than reset.
-- Advanced `init` creates one authority for a new selected folder; `attach` joins an existing
-  expected project with the recipient's own token and local paths. Never bootstrap
-  during join. Existing private parent-vault files and `.obsidian` remain untouched.
-- Private non-synced local state holds SQLite, tokens, connection settings and drafts.
-  Shared files hold readable accepted text and portable `.shared-memory.json` metadata.
-  Obsidian is optional. Local-only uses Python without a server/account; team serving
-  needs separately authorized deployment and the package's optional server dependencies.
-- `refresh`, `team-status`, `context` and `receipt` establish local accepted context.
-  Claim bounded assignments, `draft` with a base revision/evidence, `submit`, then
-  let the integration owner review and accept. In explicit schema 2, create your
-  own session and use plan/acquire with its receipt, lease and immutable draft context.
-  Existing schema-1 projects retain their claim workflow. Conflicts preserve both proposals;
-  structured factual disputes need the responsible owner's authenticated decision.
-  Arbitrary Markdown still requires semantic review by the human/agent.
-- Offline drafts survive outages. Preserve recovery journals/history; use documented
-  `promote-draft`, `recover-coordinator` and backup procedures instead of deletion.
-- Generate `team-prompt` after successful owner setup; put the returned prompt in
-  chat with real approved package/access locators. Clearly mark missing access details;
-  local setup does not make an incomplete invitation ready. Credentials use a separate private
-  channel. Do not send invitations or imply provider receipt from local checks.
-- Runtime updates use exact reviewed package installation/rollback. Joining never
-  silently migrates schemas or upgrades an owner's tracker. Live Vault migration
-  requires explicit backup/working-copy/target confirmation and its separate scope.
+Metadata/history lives in `.shared-memory.json` and `.shared-memory/` with the
+project. Per-device baseline/config/recovery stays private outside shared storage.
+Default state is a per-root application-data directory with a `folder` child; use
+the returned `state_dir` for exact discovery. Do not copy another person's baseline.
+Keep provider/OS permissions and explicit read-only bindings intact.
 
-Follow existing authorization for routine local setup without repeated permission
-requests. Provider permissions, credentials/protected sign-in, messages, deployment,
-publication and purchases remain their actual gates. Report unsupported OS/provider
-combinations and incomplete live/mixed-device checks rather than calling them ready.
+Edit notes directly, then `sync PROJECT`. Inspect `folder-status PROJECT` and
+`history PROJECT [--path RELATIVE_NOTE]`. Capture provenance identifies the observer;
+provider-arrived bytes may have been authored elsewhere. Compatible text can merge;
+semantic agreement still needs judgment. Resolve with `resolve PROJECT --path NOTE
+--text-file REVIEWED_FILE --evidence TEXT`, retaining competing history. The agent
+may review after the work; there is no mandatory reviewer or automatic approval.
 
-This release does not establish complete V1 acceptance. Distinguish automated OS/HTTPS
-fixtures from independent recipients, actual provider delivery and persistent operations.
-The product is an independent folder runtime; no native app or hosted service is included.
+Use `delete PROJECT --path NOTE --evidence TEXT` for an intended deletion and
+`rename PROJECT --source OLD --destination NEW --evidence TEXT` for a move.
+Rename does not rewrite backlinks; inspect/correct them separately. Missing files
+can be delayed provider delivery and are not silently treated as deletions.
+`watch PROJECT --interval 5 --cycles 12` is a bounded local capture loop, not an
+always-running AI service. Do not promise future provider receipt from a local call.
+
+## Existing coordinator or advisory project
+
+Formats 1/2 retain the older coordinator. Normal setup requests migration rather
+than replacing them. `setup PROJECT --workflow coordinator` explicitly keeps the
+historical route; consult its exact bundled/source guide. Do not mix folder commands
+with old proposal/session state or reinterpret pending proposals as accepted.
+
+For an authorized workflow conversion, inspect
+`migrate-folder PROJECT --state-dir OLD_STATE --backup-dir FRESH_PRIVATE_BACKUP`,
+then apply with the same arguments plus `--apply`. The complete old local authority,
+metadata and current files must be preserved and verified; remote client state
+alone is insufficient. Retry interrupted migration with its original paths. New
+folder state lives in `OLD_STATE/folder`; old SQLite/history remains private.
+The standard setup command can then discover the child from that old base.
+
+A preserved old reader roster is not a new provider ACL. Maintain actual read-only
+bindings and provider permissions. For the advisory tracker only, use the explicitly
+selected legacy references; its Python 3.9+ scripts remain separate from the product.

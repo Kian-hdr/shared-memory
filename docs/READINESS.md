@@ -1,3 +1,36 @@
+# Shared Memory readiness
+
+## Current direction: direct folders, 0.3.0
+
+Normal work means saving notes directly, including offline, with optional review
+after editing. The chosen provider transports files on reconnect; a local sync
+captures and reconciles visible history. There is no mandatory coordinator,
+integration-owner queue or hidden automatic approval in this workflow.
+
+The current contract is [FOLDER-CONTRACT.md](../product/FOLDER-CONTRACT.md).
+[The operating guide](PRODUCT-V1.md) is the normal entry point and
+[provider guidance](PROVIDERS.md) separates documented routes from actual receipt.
+
+Evidence to maintain for this workflow:
+
+- Existing-folder setup and same-format resume preserve notes/private boundaries.
+- Independent offline edits and delayed/out-of-order history remain recoverable.
+- Compatible text merges converge; overlapping/ambiguous edits remain conflicts.
+- Any authorized editor can resolve with evidence; no permanent reviewer is required.
+- Explicit delete/rename and interrupted application retain recoverable versions.
+- Local read-only configuration and actual provider permissions are honored.
+- Every chosen provider/device route separately proves downloaded bytes, history,
+  conflict-copy retention, reconnect and recipient behavior. Local fixtures do not
+  satisfy those external checks.
+
+## Historical coordinator roadmap
+
+The following dated roadmap and TEAM/COORD requirements are retained for the older
+coordinator design. Requirements for integration ownership, mandatory proposal
+acceptance or session acquisition do not govern normal format-3 folder editing.
+They remain relevant only to the explicitly retained historical workflow. Do not
+mark them passed merely because the current design removes that requirement.
+
 # Shared Memory: readiness and development roadmap
 
 **A shared workspace for your team and its AI agents.**

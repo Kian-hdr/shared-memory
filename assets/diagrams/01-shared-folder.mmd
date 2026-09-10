@@ -1,0 +1,23 @@
+flowchart LR
+  accTitle: One shared project, separate local copies
+  accDescr: People and agents edit selected project copies. A chosen provider exchanges only the project files. Private parent notes, settings and local baselines are not shared.
+  subgraph A["COMPUTER A"]
+    direction TB
+    AE["Person + agent"] -->|"read / edit / save"| AF["Selected project copy<br/>Optional vault subfolder<br/>Markdown + shared history"]
+    AF ~~~ AP
+    AP["Private parent notes / settings<br/>Private baseline outside sync"]
+  end
+  A <-->|"selected project files only"| P["ONE chosen provider<br/>Account-backed delivery unverified"]
+  subgraph B["COMPUTER B"]
+    direction TB
+    BE["Person + agent"] -->|"read / edit / save"| BF["Selected project copy<br/>Optional vault subfolder<br/>Markdown + shared history"]
+    BF ~~~ BP
+    BP["Private parent notes / settings<br/>Private baseline outside sync"]
+  end
+  P <-->|"selected project files only"| B
+  classDef private fill:#f1f5f9,stroke:#94a3b8,color:#475569;
+  classDef shared fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e;
+  classDef route fill:#ecfdf5,stroke:#059669,color:#064e3b;
+  class AP,BP private;
+  class AF,BF shared;
+  class P route;

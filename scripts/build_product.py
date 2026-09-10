@@ -11,7 +11,7 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PRODUCT_VERSION = "0.2.1"
+PRODUCT_VERSION = "0.3.0"
 TOOLKIT_VERSION = "1.3.0"
 BOOTSTRAP = r'''import hashlib
 import json
@@ -20,7 +20,7 @@ import zipfile
 
 
 def fail(code, message, exit_code):
-    print(json.dumps({"schema_version": 1, "product_version": "0.2.1",
+    print(json.dumps({"schema_version": 1, "product_version": "0.3.0",
                       "command": sys.argv[1] if len(sys.argv) > 1 else "",
                       "ok": False, "code": code, "message": message,
                       "data": {}, "warnings": []}))

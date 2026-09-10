@@ -1,7 +1,7 @@
 # Shared Memory icon
 
 Three overlapping pages share one continuous line: separate contributors, shared
-accepted knowledge. Original artwork distributed under this repository's MIT license.
+knowledge. Original artwork distributed under this repository's MIT license.
 
 - `shared-memory.svg`: editable vector source, suitable for documentation.
 - `shared-memory.png`: transparent 1024 × 1024 raster.

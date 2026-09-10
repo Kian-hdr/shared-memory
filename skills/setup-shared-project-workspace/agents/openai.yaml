@@ -1,4 +1,4 @@
 interface:
-  display_name: "Shared Project Workspace"
-  short_description: "Set up multi-user agent project tracking"
-  default_prompt: "Use $setup-shared-project-workspace to make this project safely usable by multiple people and AI agents."
+  display_name: "Shared Memory"
+  short_description: "Direct shared notes and recoverable local sync"
+  default_prompt: "Use $setup-shared-project-workspace to set up this folder for direct note editing and preserve offline work."

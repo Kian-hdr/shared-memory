@@ -1,0 +1,17 @@
+flowchart LR
+  accTitle: Choose one provider route for each physical project
+  accDescr: Google Drive, iCloud Drive, OneDrive and operator-managed Nextcloud are alternative routes, not interconnected bridges. Nextcloud is the recommended first self-hosted option, not provisioned. Account-backed Shared Memory delivery is unverified for these routes.
+  P["Selected physical project<br/>Choose ONE route"] --> G["Google Drive<br/>Account / OS route must be verified"]
+  P --> I["iCloud Drive<br/>Account / OS route must be verified"]
+  P --> O["OneDrive<br/>Account / OS route must be verified"]
+  P --> N["Nextcloud · operator managed<br/>Recommended first self-hosted option<br/>Not provisioned"]
+  G --> D["Other authorized local copies<br/>Verify delivered history + content<br/>Account-backed delivery unverified"]
+  I --> D
+  O --> D
+  N --> D
+  classDef state fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e;
+  classDef route fill:#f8fafc,stroke:#64748b,color:#0f172a;
+  classDef selfhost fill:#ecfdf5,stroke:#059669,color:#064e3b;
+  class P,D state;
+  class G,I,O route;
+  class N selfhost;

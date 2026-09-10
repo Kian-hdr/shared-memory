@@ -1,0 +1,16 @@
+flowchart TB
+  accTitle: Offline branches retain their causal history
+  accDescr: Two edits descend from a common version. On reconnect, complete history supports a compatible merge or a retained conflict. Any authorized editor can resolve with evidence. A clean text merge does not establish factual truth.
+  B["Shared earlier version"] --> A["Copy A: edit offline<br/>Save; sync records parent + change"]
+  B --> C["Copy B: edit independently<br/>Save; sync records parent + change"]
+  A --> J["Reconnect · provider delivers<br/>Sync checks complete parent history"]
+  C --> J
+  J -->|"compatible text"| M["Merge + record history<br/>Keep ancestry; review factual meaning"]
+  J -->|"conflicting edits"| K["Retain competing versions<br/>Do not silently choose a winner"]
+  K --> R["Any authorized editor resolves<br/>Record chosen result + source evidence"]
+  classDef state fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e;
+  classDef merge fill:#ecfdf5,stroke:#059669,color:#064e3b;
+  classDef conflict fill:#fff7ed,stroke:#c2410c,color:#7c2d12;
+  class B,A,C,J state;
+  class M merge;
+  class K,R conflict;

@@ -1,3 +1,5 @@
+> **Version scope:** Historical 0.2.x coordinator contract, retained for explicit compatibility. Normal 0.3.0 direct-folder work follows [FOLDER-CONTRACT.md](FOLDER-CONTRACT.md), not these mandatory proposal/session rules.
+
 # Shared Memory authoritative engine contract
 
 Implementation target: product 0.2.0 development, not a stable release. This extends
@@ -53,7 +55,7 @@ Old pending proposals are preserved but require explicit legacy assignment rebin
 and a new proposal context before further publication. Schema upgrades preserve
 old request bytes and event prefixes.
 
-See [session operation and upgrade instructions](../docs/PRODUCT-V1.md#session-based-coordination)
+See [session operation and upgrade instructions](../docs/COORDINATOR-WORKFLOW.md#session-based-coordination)
 for CLI/configuration payloads and [the extension gates](../docs/READINESS.md#approved-autonomous-coordination-and-graph-extension-2026-09-08)
 for required acceptance. Full output versions use `output {assignment_id,output_revision}`;
 `outputs {assignment_id,offset?,limit?}` returns bounded summaries. The independent

@@ -1,5 +1,41 @@
 # Validation record
 
+## 0.3.0 evidence boundary
+
+Verified locally on 2026-09-10: the full Python 3.13 product suite collected
+444 tests, with 424 passed and 20 platform-specific skips. All 32 focused folder
+engine cases passed on both Python 3.12 and 3.13 without skips. Seven packaged CLI
+cases cover the direct default, separate-device setup, read-only refusal and
+recoverable migration, including refusal of a changed recovery archive. Two
+packaged process-recovery tests exercise multiple real initialization/attach exits.
+Independent probes verified protected-subtree exclusion, read-only evacuation
+recovery, migration interruption and backup tamper refusal. A separate skill
+forward test executed 15 real CLI calls with synthetic local copies and no
+coordinator or approval operations. Those development-package checks do not claim
+an anonymously downloaded final release until its separate verification is recorded.
+
+Four Mermaid diagrams passed real Mermaid CLI 11.17.0 rendering, visual inspection,
+SVG/XML accessibility and link checks. The renderer and editable sources are
+version-controlled; figure rendering is not provider acceptance evidence.
+Three-OS CI and final release asset verification are recorded separately for their
+exact source revision. No live account-backed provider or independent-person
+receipt is asserted by these local results.
+
+The current default is direct-folder editing with portable history. Its checks must
+cover direct-save capture, offline branches, compatible reconciliation, unresolved
+conflicts, provider-copy preservation, explicit deletion/rename, read-only behavior
+and interrupted recovery. No mandatory integrator or hidden acceptance loop is
+part of the target. See [the folder contract](product/FOLDER-CONTRACT.md).
+
+The historical results below were recorded for earlier toolkit/coordinator releases.
+They are preserved as evidence for those versions, not relabeled as folder-mode
+provider passes. Current local source/package tests and actual independent-provider
+readback must be distinguished when recording release validation. Official provider
+documentation, installed clients, directory presence and zero/nonzero configured
+remotes are environmental facts; none is proof that project bytes reached another
+recipient. [Provider guidance](docs/PROVIDERS.md) records the current researched scope.
+
+
 ## Normal 0.2.0 release validation, 2026-09-08
 
 The normal release replaces mandatory alpha onboarding with `setup PROJECT` and a

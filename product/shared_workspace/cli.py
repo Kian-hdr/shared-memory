@@ -18,6 +18,7 @@ from . import knowledge_workflow
 from . import coordination_workflow
 from . import graph_rename
 from . import onboarding
+from . import folder_workflow
 
 COMMANDS = ("version", "guide", "capabilities", "create", "join", "doctor", "status", "work", "teammate-prompt")
 
@@ -60,12 +61,15 @@ def parser() -> argparse.ArgumentParser:
     coordination_workflow.add_commands(commands)
     graph_rename.add_commands(commands)
     onboarding.add_commands(commands)
+    folder_workflow.add_commands(commands)
     return result
 
 
 def capabilities() -> dict:
     return {
-        "commands": list(COMMANDS) + list(workflow.TEAM_COMMANDS) + list(maintenance.COMMANDS) + list(delivery_workflow.COMMANDS) + list(knowledge_workflow.COMMANDS) + list(coordination_workflow.COMMANDS) + list(graph_rename.COMMANDS) + list(onboarding.COMMANDS),
+        "commands": list(COMMANDS) + list(folder_workflow.COMMANDS) + list(workflow.TEAM_COMMANDS) + list(maintenance.COMMANDS) + list(delivery_workflow.COMMANDS) + list(knowledge_workflow.COMMANDS) + list(coordination_workflow.COMMANDS) + list(graph_rename.COMMANDS) + list(onboarding.COMMANDS),
+        "default_workflow": "folder",
+        "folder_workflow": {"commands": list(folder_workflow.COMMANDS), "direct_edits": True, "mandatory_approval": False, "coordinator_required": False, "history": "immutable_files", "provider_delivery": "unverified", "missing_file_is_delete": False, "self_hosted_candidate": "nextcloud"},
         "implemented": {"selected_folder_setup": True, "portable_project_identity": True,
                         "trusted_bundle_execution": True, "json_output": True,
                         "advisory_claims_handoffs_and_evidence": True,
@@ -73,7 +77,7 @@ def capabilities() -> dict:
                         "preserved_offline_drafts": True, "recoverable_materialization": True,
                         "reviewed_package_installation": True, "local_receipt_verification": True,
                         "resumable_selected_folder_onboarding": True},
-        "coordination_extension": {"opt_in_schema": 2, "default_schema": 1,
+        "coordination_extension": {"historical_workflow_only": True, "opt_in_schema": 2, "default_schema": 1,
                                    "commands": list(coordination_workflow.COMMANDS),
                                    "explicit_session_credentials": True, "automatic_renewal": False,
                                    "live_vault_migration": False, "acceptance": "bounded_local_validation"},
@@ -81,10 +85,10 @@ def capabilities() -> dict:
                             "sources": ["local_selected_folder", "accepted_coordinator_snapshot"],
                             "parent_vault_reads": False, "policy_authority": False,
                             "native_rename_command": False},
-        "reviewed_note_rename": {"commands": list(graph_rename.COMMANDS), "acceptance_required": True,
+        "reviewed_note_rename": {"historical_workflow_only": True, "commands": list(graph_rename.COMMANDS), "acceptance_required": True,
                                 "scope": "selected_folder_markdown", "outer_backlinks": "unknown",
                                 "recovery": "private_client_journal", "filesystem_atomicity": False},
-        "explicit_delivery": {"commands": list(delivery_workflow.COMMANDS),
+        "explicit_delivery": {"historical_coordinator_adapter": True, "commands": list(delivery_workflow.COMMANDS),
                               "routes": ["local_fixture", "google_drive_rclone"],
                               "initial_join": "coordinator_attach_required",
                               "google_drive_live_acceptance": "not_run",
@@ -98,7 +102,7 @@ def capabilities() -> dict:
                              "TEAM-10": "live_provider_not_run", "TEAM-11": "mixed_os_not_run"},
         "content_modes": {"default": "legacy", "opt_in": "markdown", "markdown_manifest_format": 2,
                           "required_accepted_paths_preserved": True, "authority_version_handshake": False},
-        "release_status": "local_candidate", "stable_v1": False,
+        "release_status": "release", "stable_v1": False,
         "python": {"minimum": "3.11", "rehearsal_baseline": "3.13"},
         "mixed_os_acceptance": "not_run", "hosted_remote_readiness": "unverified",
     }
@@ -140,7 +144,9 @@ def main(argv=None) -> int:
             if getattr(args, name, None) is not None and not getattr(args, name).strip():
                 raise ProductError(2, "usage_error", f"--{name} cannot be empty.")
         with open_bundle(args.bundle) as bundle:
-            if command in onboarding.COMMANDS:
+            if command in folder_workflow.COMMANDS or (command in {'status', 'receipt', 'team-status', 'provider-check'} and folder_workflow.is_folder(workflow.selected_root(args.project))):
+                data = folder_workflow.dispatch(bundle, args)
+            elif command in onboarding.COMMANDS:
                 data = onboarding.dispatch(bundle, args)
             elif command in graph_rename.COMMANDS:
                 data = graph_rename.dispatch(bundle, args)

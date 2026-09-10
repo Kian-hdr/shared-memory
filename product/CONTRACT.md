@@ -1,3 +1,5 @@
+> **Version scope:** Historical 0.1.0 tracker-preview contract. Current default behavior is specified in [FOLDER-CONTRACT.md](FOLDER-CONTRACT.md); the coordinator is a separate retained mode.
+
 # Shared Memory: Product V1 first milestone CLI contract
 
 Status: historical implementation contract for product preview 0.1.0. Current

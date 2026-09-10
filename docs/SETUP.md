@@ -1,35 +1,22 @@
 # Shared Memory setup routes
 
-## Start with your own agent
+For normal 0.3.0 use, [paste the setup prompt](../SETUP-PROMPT.md), select the folder
+and let the agent finish local setup. Runtime verification, Python 3.11+, existing
+project-format detection and private state discovery are covered by the
+[operating guide](PRODUCT-V1.md#agent-guided-setup).
 
-1. [Copy the setup prompt](../SETUP-PROMPT.md) into an agent connected to your computer.
-2. Select an existing project folder or choose a new folder.
-3. Let the agent install missing authorized prerequisites, verify release **v0.2.0**, run setup and check the local receipt.
+`setup PROJECT` defaults to direct folder editing. Ordinary setup needs no server,
+coordinator credential, integrator, Obsidian launch or disposable copy. A delivered
+format-3 folder is joined using the recipient's own local baseline and actual folder
+access. Use one chosen provider and preserve private parent folders/settings.
 
-Runtime `0.2.0` needs Python 3.11+. Your agent discovers or installs it and verifies
-`shared-memory-0.2.0.pyz` against the release's external `SHA256SUMS` before execution.
-A selected subfolder inside an existing private Obsidian vault is valid. No app launch,
-new vault, disposable copy or cloud account is required for local operation.
+Existing coordinator formats require explicit backed-up `migrate-folder` to switch;
+`--workflow coordinator` retains the older route when requested. Never reset old
+history to make current setup pass. [Provider guidance](PROVIDERS.md) separates
+local-file readiness from actual cross-device receipt.
 
-`setup PROJECT` creates or resumes the local project using deterministic private
-state and a stable identity when none is supplied. It preserves existing project
-content and keeps tokens, drafts, backups and SQLite outside the shared folder.
-The agent can create the new folder you selected, fix routine prerequisites and rerun
-interrupted setup with its original state. It must preserve authority, journals and
-drafts rather than reset them to clear errors. See the
-[operating guide](PRODUCT-V1.md#agent-guided-setup) for commands and exact limits.
-
-To join an existing authority, use your own member credential, expected project ID
-and the operator's authorized reachable endpoint with setup's explicit join inputs.
-Never create a second authority for the same project. Cross-computer operation requires
-verified TLS and an operator who keeps that service reachable; the package does not
-automatically deploy a server or provide managed hosting. Local receipt, independent
-recipient checks and Google Drive/OneDrive/iCloud delivery remain separate results.
-
-The advanced `init`, `attach`, session coordination, backup and migration interfaces
-are documented in the [product operating guide](PRODUCT-V1.md). Broader acceptance
-gates remain tracked in [readiness](READINESS.md), without becoming mandatory steps
-for ordinary local onboarding.
+The rest of this document preserves the explicit advisory toolkit instructions.
+Its tracker, claims and generated files are not the 0.3.0 default.
 
 ## Legacy advisory tracker setup
 

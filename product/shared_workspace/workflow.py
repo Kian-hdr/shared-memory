@@ -95,8 +95,8 @@ def private_path(value, project=None):
     path = absolute_path(raw).resolve()
     if unsafe_ancestor(path) is not None:
         raise ProductError(3, "state_path_unsafe", "Private state cannot use symbolic links or reparse points.")
-    lower = str(path).casefold()
-    if any(marker in lower for marker in ("/cloudstorage/", "/mobile documents/", "onedrive", "googledrive", "google drive", "dropbox")) or str(path).startswith("\\\\"):
+    lower = str(path).replace("\\", "/").casefold()
+    if any(marker in lower for marker in ("/cloudstorage/", "/mobile documents/", "/nextcloud/", "onedrive", "googledrive", "google drive", "dropbox")) or str(path).startswith("\\\\"):
         raise ProductError(3, "state_path_unsafe", "Coordinator/client state belongs on local non-synchronized storage.")
     if project and (path == project or path.is_relative_to(project) or project.is_relative_to(path)):
         raise ProductError(3, "state_path_unsafe", "Private state and the project must be separate directory trees.")

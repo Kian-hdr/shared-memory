@@ -46,6 +46,8 @@ def main():
         if project is not None:
             call += [str(project), "--state-dir", str(private)]
         call += list(map(str, options))
+        if command == 'setup':
+            call += ['--workflow', 'coordinator']
         completed = subprocess.run(call, capture_output=True, text=True, timeout=40)
         data = json.loads(completed.stdout)
         if completed.returncode or not data["ok"]:

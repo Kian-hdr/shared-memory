@@ -1,3 +1,5 @@
+> **Historical advisory toolkit reference.** This applies only when that older tracker is explicitly selected. Normal Shared Memory 0.3.0 uses direct folder editing; see [product runtime routing](product-runtime.md).
+
 # Retrofit policy
 
 Retrofitting must preserve the target project's existing authority and history.

@@ -1,3 +1,5 @@
+> **Historical advisory toolkit reference.** This applies only when that older tracker is explicitly selected. Normal Shared Memory 0.3.0 uses direct folder editing; see [product runtime routing](product-runtime.md).
+
 # Coordination record schema
 
 Schema version `1` uses Markdown notes with flat YAML frontmatter so Obsidian Bases,

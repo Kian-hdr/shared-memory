@@ -1,3 +1,5 @@
+> **Version scope:** Historical advisory-toolkit demo. This synthetic fixture does not demonstrate the current direct-folder engine or real provider receipt. Use [the current guide](PRODUCT-V1.md) for normal work.
+
 # Shared Memory: one shared project folder
 
 A shared workspace for your team and its AI agents.

@@ -1,80 +1,64 @@
 # Set up Shared Memory
 
-Copy the whole block into an agent running on or connected to your computer.
-Choose an existing project folder or a new folder when needed; your agent handles
-the local setup. Release **v0.2.0**, runtime **0.2.0**. Obsidian is optional.
+Copy the block into an agent running on or connected to your computer. Select the
+folder when it asks for information it cannot discover. No placeholders need editing.
 
 ```text
-Set up Shared Memory for my project and make it usable with my agent. Use release:
-https://github.com/Kian-hdr/shared-memory/releases/tag/v0.2.0
+Set up Shared Memory 0.3.0 for the folder I want to work in. Use the normal direct
+folder workflow: people and agents edit notes normally, save offline, and reconcile
+shared changes when the chosen provider reconnects. Reviews are optional after edits;
+do not install a mandatory coordinator, proposal queue or always-online integrator,
+and do not replace those gates with hidden automatic approval.
 
-First discover my OS, available tools, existing instructions and selected project.
-If the folder is not clear, ask me to select an existing folder or choose a new one.
-A subfolder inside my existing private vault is valid. Create a missing folder only
-when it is the new folder I chose. Preserve the parent, siblings, existing home and
-instructions, settings, canonical notes and unrelated artifacts. Do not require a
-trial copy, new vault, Obsidian installation, registration or app launch.
+Read my existing instructions and discover the selected folder, current Shared
+Memory format, available Python 3.11+ and installed runtime. A selected subfolder in
+my existing private Obsidian vault is valid. Preserve existing notes, instructions,
+parent folders, settings and attachments. Do not create or open a vault merely for
+setup. Create a new ordinary folder only if that is the folder I selected.
 
-Reuse compatible installed Python 3.11+. If it is missing, discover the recipient's
-supported installation route and install a maintained compatible Python from its
-official source or the existing trusted package manager under this setup request.
-Verify the installed interpreter and use its actual path. Complete routine local
-prerequisites and correctable PATH problems without another questionnaire. Respect
-required administrator approval, OS consent, sign-in, MFA and your actual tool
-permissions; resume after any necessary human interaction. Do not weaken those gates.
+Use the specific release at:
+https://github.com/Kian-hdr/shared-memory/releases/tag/v0.3.0
+Obtain shared-memory-0.3.0.pyz and its external SHA256SUMS when those assets are
+available. Verify the external hash before execution, then read version, capabilities
+and the bundled guide. If using a candidate I already supplied, verify that exact
+candidate instead. Do not execute mismatched bytes or silently install an older
+release with a different workflow. Reuse working prerequisites and install missing
+local components within my task authorization.
 
-Download shared-memory-0.2.0.pyz and SHA256SUMS from that exact release into my own
-private local tools directory outside the project and consumer-sync storage. Read
-the checksum file without executing the archive and compare the executable's SHA-256
-against its exact filename entry. A missing or mismatched asset must not be executed;
-report the specific problem, without substituting main, an older tracker or another
-release. Once verified, inspect version, capabilities, guide and setup --help from
-the downloaded executable. Install the verified package with install-package and
-use its returned immutable executable path. Optional skill installation uses the
-whole matching skill archive, checks its external hash and preserves existing installs.
+Run setup for the folder. Reuse its actual provider and the user's own local copy.
+Keep each computer's private baseline and recovery state outside shared storage.
+The shared folder carries the product's portable metadata/history, not a credential
+or SQLite database. Discover existing state rather than asking me for coordinator
+endpoints, member tokens or session leases for normal folder use.
 
-Run the verified package's setup command against my selected folder. Let it select
-its deterministic private local state and stable local identity unless this project
-already has explicit authorized inputs. Reuse an existing connection and original
-setup intent. Keep tokens, sessions, connection settings, drafts, backups and SQLite
-outside shared files and synchronized/network storage. Do not copy credentials,
-private conversations, histories or another person's identity between agents.
+If the folder already uses the old coordinator format, diagnose it first. Keep its
+identity and history intact. Explain the available backed-up migrate-folder operation
+and perform the migration when covered by my request; do not silently initialize
+a second project or discard old state. Explicitly retained coordinator projects use
+the historical workflow instead of mixing the two protocols.
 
-If I am joining an existing team project, discover the supplied access instructions
-and use my own privately issued member token, expected project ID and authorized
-reachable coordinator endpoint with setup's documented join options. Obtain only
-missing essential access inputs. Never initialize a second authority, replace a
-lost authority with an empty one, or silently upgrade existing state. Cross-computer
-operation needs an operator's reachable authenticated TLS service; local setup does
-not create hosting. Membership and provider access are separate.
+For sharing, use one chosen provider for the selected folder, not a bridge between
+Google Drive, iCloud, OneDrive and Nextcloud. Local-only work needs no provider.
+Complete the selected provider's necessary local setup; preserve its read-only and
+sharing permissions. Respect unavoidable sign-in, MFA, OS controls and explicit
+limits in my request. Do not infer access to someone else's folder or provision an
+unrequested hosted service. Keep files needed offline actually downloaded, and
+check that the product's shared history is included in provider synchronization.
 
-Complete recoverable setup problems yourself within these boundaries: correct
-missing local prerequisites, create the chosen new folder, and rerun setup with the
-same folder/state and original setup inputs after an interruption. Use documented
-refresh/recovery when a saved journal or receipt requires it. Preserve immutable
-intents, drafts, originals, backups and accepted history. Do not delete state, change
-project identity, bypass permissions or overwrite an unexplained conflict to obtain
-a green result. A real identity, access or corruption failure needs its specific
-recovery route; report that blocker while finishing independent local steps.
+After direct edits, run sync to capture them and reconcile visible history. Repeat
+after reconnecting or receiving provider changes. Preserve conflict copies before
+cleanup, including copies a provider has not uploaded. Merge only compatible text;
+leave ambiguous or contradictory versions available and use an explicit resolution
+with evidence. Any editor authorized for that folder may resolve a conflict; do not
+invent a permanent reviewer. Textual convergence is not proof of factual correctness.
+Use explicit deletion/rename operations when intended, and validate affected links.
 
-Check team-status and receipt against the authenticated authority. Show me the selected
-folder, exact release/checksum, project ID, actor, private state location, receipt and
-any preserved drafts or excluded artifacts. Give concise project-specific commands
-or agent instructions for reading current context, acquiring bounded work, saving a
-draft, submitting it and accepting it through the authorized integration actor.
-Inspect the actual schema: schema 2 requires a distinct authenticated running session
-and retained lease/generation/policy/input context. Do not silently upgrade schema 1.
-Authorized agents may perform routine integration; do not invent a mandatory human
-review step. Keep each agent's own conversation and history private.
-
-Finish with usable local operation, or the exact remaining blocker. Report local
-receipt, team endpoint availability and provider delivery separately. Do not call a
-local receipt complete team sharing, a hosted service or verified Google Drive,
-OneDrive or iCloud delivery. If joining instructions are requested, prepare the
-project-specific teammate prompt in chat with approved access/package locators and
-no credentials or sender-local paths; do not send it automatically. Do not invite
-members, change sharing/accounts, purchase, deploy a server, restructure the vault
-or alter backup drives without authorization for that action.
+Finish feasible local setup and report the selected project identity, saved local
+state, current folder status, conflicts or preserved work, and what provider/device
+receipt was actually checked. Do not require a disposable trial before normal use.
+Return a concise teammate prompt with the actual folder/provider access instructions
+and exact compatible package source, no credentials or sender-specific private paths.
+Mark missing access clearly and do not send the prompt automatically.
 ```
 
-[Operating guide](docs/PRODUCT-V1.md) · [Advanced setup routes](docs/SETUP.md)
+[Operating guide](docs/PRODUCT-V1.md) · [Provider choices](docs/PROVIDERS.md)

@@ -25,7 +25,9 @@ def add_commands(commands):
     setup.add_argument('--state-dir', help='Private local state; defaults to a deterministic per-folder application-data directory')
     for name in IDENTITY:
         setup.add_argument('--' + name)
-    setup.add_argument('--provider', choices=workflow.PROVIDERS)
+    setup.add_argument('--provider', choices=tuple(dict.fromkeys((*workflow.PROVIDERS, 'nextcloud'))))
+    setup.add_argument('--workflow', choices=('folder', 'coordinator'), default='folder', help='Direct shared-folder editing by default; coordinator is historical compatibility')
+    setup.add_argument('--read-only', action='store_true', help='Preserve an explicit read-only local binding; provider/OS permissions remain authoritative')
     setup.add_argument('--content-mode', choices=CONTENT_MODES, help='Opt in to Markdown-only discovery for a new project; existing mode is retained')
     setup.add_argument('--expected-project-id')
     route = setup.add_mutually_exclusive_group()
@@ -150,6 +152,9 @@ def _fresh_arguments(args, root, state, metadata):
 
 
 def dispatch(bundle, args):
+    if getattr(args, 'workflow', 'folder') == 'folder':
+        from .folder_workflow import setup
+        return setup(args)
     for field in ('state_dir', *IDENTITY, 'provider', 'content_mode', *JOIN):
         value = getattr(args, field)
         if value is not None and not value.strip():

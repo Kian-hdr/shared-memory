@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.3.0, direct-folder workflow
+
+- Ordinary note editing is the default. Local saves and captured change history no
+  longer depend on a coordinator, proposal queue or designated integrator. Reviews
+  are optional after edits, without hidden automatic approval.
+- Add format-3 portable history, per-device baselines, compatible text reconciliation,
+  preserved conflicts and explicit evidence-backed resolution/delete/rename commands.
+  Rename does not rewrite backlinks; capture provenance is self-asserted.
+- Add explicit backed-up conversion from the retained coordinator workflow, keeping
+  old history and project identity. Provider ACLs and local read-only bindings remain.
+- Synchronization uses one chosen provider. Google Drive, iCloud, OneDrive and
+  Nextcloud guidance separates offline availability from actual remote receipt;
+  no bridge, managed hosting or automatic provider provisioning is introduced.
+- Update setup prompt, distributed skill and four diagrams for the direct workflow.
+  Exact release checks are recorded in VALIDATION.md; historical counts below do
+  not establish new folder/provider acceptance.
+
+Older entries retain their dated workflow and publication statements.
+
 ## 0.2.1, local compatibility candidate, unreleased
 
 - Add opt-in Markdown content mode for existing Vaults: preserve untracked attachments,
