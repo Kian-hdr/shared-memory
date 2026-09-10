@@ -43,7 +43,7 @@ settings stay outside the exchange; there is no approval queue between agents.
 
 ## Get started
 
-1. [Paste the setup prompt](SETUP-PROMPT.md) into an agent connected to your computer.
+1. [Paste the v0.3.0 setup / upgrade prompt](SETUP-PROMPT.md) into an agent connected to your computer.
 2. Select the folder and use its existing sharing provider, if any.
 3. Let the agent finish setup, then edit your notes normally.
 
@@ -53,9 +53,9 @@ provider and have their agent set up that local copy. Each computer keeps its ow
 private baseline. Do not copy another person's private state.
 
 [Release v0.3.0](https://github.com/Kian-hdr/shared-memory/releases/tag/v0.3.0) is the
-version-specific download location. Execute only assets actually present there and
-verified against its external `SHA256SUMS`, or an explicitly supplied reviewed
-candidate. The expected runtime is `shared-memory-0.3.0.pyz`; the matching full kit,
+version-specific download location. The setup prompt includes direct asset links
+and the runtime SHA-256; verify the download against the release
+`SHA256SUMS` before execution. The runtime is `shared-memory-0.3.0.pyz`; the matching full kit,
 setup prompt, optional skill and icons are separate assets. A download does not grant
 access to another person's folders.
 

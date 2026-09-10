@@ -2,6 +2,8 @@
 
 Copy the block into an agent running on or connected to your computer. Select the
 folder when it asks for information it cannot discover. No placeholders need editing.
+This prompt targets the published **v0.3.0** release and supports new setups or
+updating an existing installation while preserving its project and private state.
 
 ```text
 Set up Shared Memory 0.3.0 for the folder I want to work in. Use the normal direct
@@ -16,16 +18,30 @@ my existing private Obsidian vault is valid. Preserve existing notes, instructio
 parent folders, settings and attachments. Do not create or open a vault merely for
 setup. Create a new ordinary folder only if that is the folder I selected.
 
-Use the specific release at:
+Use the published release at:
 https://github.com/Kian-hdr/shared-memory/releases/tag/v0.3.0
-Obtain shared-memory-0.3.0.pyz and its external SHA256SUMS when those assets are
-available. Verify the external hash before execution, then read version, capabilities
-and the bundled guide. If using a candidate I already supplied, verify that exact
-candidate instead. Do not execute mismatched bytes or silently install an older
-release with a different workflow. Reuse working prerequisites and install missing
-local components within my task authorization.
+Download the runtime and external checksum file from these exact URLs:
+https://github.com/Kian-hdr/shared-memory/releases/download/v0.3.0/shared-memory-0.3.0.pyz
+https://github.com/Kian-hdr/shared-memory/releases/download/v0.3.0/SHA256SUMS
+The runtime's expected SHA-256 is:
+32f8cc4ef06050b6859d0a5236370819fc66ac0769051551e892c5801436e91d
+Verify the downloaded runtime against both that value and its SHA256SUMS entry
+before execution. If a download is unavailable or the checks disagree, report the
+exact blocker; do not substitute a candidate or older release. Reuse working
+prerequisites and install missing local components within my task authorization.
 
-Run setup for the folder. Reuse its actual provider and the user's own local copy.
+Read the verified package's version, capabilities, guide and setup --help. Confirm
+version 0.3.0 and direct-folder support. Install it outside shared storage with
+install-package, passing the verified package as its positional argument plus
+--sha256 and --tools-dir with actual local values. Use the immutable installed path
+returned by that command for subsequent operations. Reuse an already verified
+identical installation. Preserve prior runtime versions and existing private device
+state when upgrading; never copy another person's identity, baseline or credentials.
+
+Inspect the project format before setup. For a new or existing format-3 folder,
+run setup using the selected path and reuse its actual provider and my own local
+copy. When joining a known project, check its delivered identity and use
+--expected-project-id; missing metadata is not permission to create a second project.
 Keep each computer's private baseline and recovery state outside shared storage.
 The shared folder carries the product's portable metadata/history, not a credential
 or SQLite database. Discover existing state rather than asking me for coordinator
@@ -45,6 +61,7 @@ limits in my request. Do not infer access to someone else's folder or provision 
 unrequested hosted service. Keep files needed offline actually downloaded, and
 check that the product's shared history is included in provider synchronization.
 
+After setup, run sync and folder-status with the returned private-state path.
 After direct edits, run sync to capture them and reconcile visible history. Repeat
 after reconnecting or receiving provider changes. Preserve conflict copies before
 cleanup, including copies a provider has not uploaded. Merge only compatible text;
