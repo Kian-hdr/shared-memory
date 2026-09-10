@@ -93,3 +93,11 @@ reports `rename_divergences` and a `rename_intent_divergence` warning; readiness
 still be ready for converged bytes. This does not establish agreed intent. An
 editing member can acknowledge the retained copies with evidence through existing
 resolution or deletion of the original source, without an approval role.
+
+## Interrupted pre-cutover planning
+
+Explicit `migrate-folder --replan` may replace a superseded pre-cutover intent only
+with a fresh private backup directory, unchanged project identity and an editing
+historical member. Applying it preserves the old intent and backup. Once the
+format changes or new folder state exists, only the original recovery path can
+resume; replan cannot reset that history.

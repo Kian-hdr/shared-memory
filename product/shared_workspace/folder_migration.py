@@ -21,6 +21,16 @@ def atomic_json(path, value):
     os.replace(temporary, path)
 
 
+def preserve_bytes(path, data):
+    """Recovery copies must not pass through Windows text newline translation."""
+    workflow.private_path(path)
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_BINARY', 0)
+    with os.fdopen(os.open(path, flags, 0o600), 'wb') as stream:
+        stream.write(data)
+        stream.flush()
+        os.fsync(stream.fileno())
+
+
 def verify_recovery(journal, backup):
     """A retry must prove its recovery inputs still match the completed backup."""
     from .coordinator_migration import verify_checkpoint
@@ -94,7 +104,7 @@ def current_files(root, accepted):
     return result, missing
 
 
-def migrate(root, state, backup_dir, *, apply=False):
+def migrate(root, state, backup_dir, *, apply=False, replan=False):
     from .folder import Folder
     from .maintenance import backup_coordinator
     root, state = workflow.selected_root(root), workflow.private_path(state, root)
@@ -105,6 +115,32 @@ def migrate(root, state, backup_dir, *, apply=False):
     journal = workflow.json_file(journal_path) if journal_path.exists() else None
     manifest_path = root / workflow.MANIFEST
     metadata = workflow.json_file(manifest_path) if manifest_path.exists() else None
+    if replan:
+        if (not journal or journal.get('status') != 'backed_up' or not metadata
+                or metadata.get('format_version') not in {1, 2} or metadata.get('protocol') != 1
+                or metadata.get('provider') != journal.get('provider')
+                or metadata.get('workflow') == 'folder' or (state / 'folder').exists()
+                or journal.get('root') != str(root) or str(backup) == journal.get('backup_dir') or backup.exists()):
+            raise ProductError(4, 'migration_replan', 'Replanning requires an unchanged pre-cutover format, no new folder state, and a fresh different private backup directory.')
+        _, current, authorized, _, _, _, _ = legacy_identity(state)
+        if authorized['role'] == 'reader' or current['project_id'] != journal['project_id'] or metadata['project_id'] != journal['project_id']:
+            raise ProductError(4, 'migration_replan', 'Replanning cannot widen read-only access or switch project identity.')
+        if apply:
+            old = journal_path.read_bytes()
+            history = state / 'folder-migration-intents'
+            history.mkdir(mode=0o700, exist_ok=True)
+            destination = history / (hashlib.sha256(old).hexdigest() + '.json')
+            if destination.exists():
+                if destination.read_bytes() != old:
+                    raise ProductError(4, 'migration_replan', 'Preserved migration intent differs; inspect private recovery history.')
+            else:
+                preserve_bytes(destination, old)
+        # The original authority and prior backup are not edited or restored.
+        # A read-only replan reports the fresh plan without changing its intent.
+        journal = None
+    if metadata and metadata.get('workflow') != 'folder':
+        # Unknown formats cannot be treated as legacy solely because their UUID matches.
+        metadata = workflow.project_manifest(root)
     if journal and (journal['root'] != str(root) or journal['backup_dir'] != str(backup)):
         raise ProductError(3, 'migration_binding', 'Resume the original migration with its original private backup directory.')
     if journal:
@@ -140,6 +176,7 @@ def migrate(root, state, backup_dir, *, apply=False):
             'coordinator_required_after_migration': False, 'backup_dir': str(backup),
             'read_only_access': 'Existing provider/OS restrictions remain; legacy reader bindings are retained privately.',
             'applied': False}
+    plan['replanned'] = replan
     if not apply:
         return plan
     if missing:
@@ -155,7 +192,7 @@ def migrate(root, state, backup_dir, *, apply=False):
             row = db.execute('SELECT revision,files_hash FROM snapshots ORDER BY revision DESC LIMIT 1').fetchone()
             if row != (info['revision'], accepted_hash):
                 raise ProductError(4, 'migration_changed', 'Authority changed during backup. Retain the backup and inspect the new state before retrying.')
-        workflow.write_private(backup / 'manifest.json', manifest_path.read_text(encoding='utf-8'))
+        preserve_bytes(backup / 'manifest.json', manifest_path.read_bytes())
         workflow.write_private(backup / 'present-notes.json', json.dumps(files, ensure_ascii=False))
         workflow.write_private(backup / 'legacy-identities.json', json.dumps(people, ensure_ascii=False))
         workflow.write_private(backup / 'migration-plan.json', json.dumps(plan, ensure_ascii=False))

@@ -202,6 +202,12 @@ outside the share. Legacy membership records are preserved as evidence. They do 
 automatically become provider ACLs. Read-only local bindings and provider rights must
 remain correct. Pending old proposals are retained historically, not silently approved.
 
+If newer notes or authority history invalidate a saved plan before cutover, use a
+fresh different backup directory with `migrate-folder --replan`, inspect that plan,
+then repeat with `--apply`. Replanning preserves the previous intent and backup.
+It is refused after format-3 cutover begins or new folder state exists; resume the
+original migration in that case. A read-only replan does not change private state.
+
 ## Scope and validation
 
 The local implementation is bounded: ordinary UTF-8 text/path validation applies,

@@ -484,4 +484,67 @@ class FolderTests(unittest.TestCase):
         self.assertFalse((root / module.MANIFEST).exists())
 
 
+    def test_stable_read_accepts_stable_cross_api_timestamp_differences(self):
+        from types import SimpleNamespace
+        path = self.base / 'windows-stat.bin'
+        content = b'CRLF\r\nMixed\nCtrlZ\x1aExact'
+        path.write_bytes(content)
+        original = module.os.fstat
+        def descriptor_metadata(fd):
+            info = original(fd)
+            # Windows path stat may expose creation-time ctime while fstat
+            # exposes metadata-change time. Compare each API with itself.
+            return SimpleNamespace(st_dev=info.st_dev, st_ino=info.st_ino, st_mode=info.st_mode,
+                                   st_size=info.st_size, st_mtime_ns=info.st_mtime_ns + 17,
+                                   st_ctime_ns=info.st_ctime_ns + 10_000_000_000)
+        with patch.object(module.os, 'fstat', descriptor_metadata):
+            self.assertEqual(module.read_bytes(path), content)
+
+    def test_stable_read_rejects_real_replacement_between_path_check_and_open(self):
+        path = self.base / 'replace-during-read.txt'; path.write_bytes(b'original')
+        replacement = self.base / 'replacement.txt'; replacement.write_bytes(b'replaced')
+        before = path.stat()
+        os.utime(replacement, ns=(before.st_atime_ns, before.st_mtime_ns))
+        original = module.os.open
+        changed = []
+        def replace_before_open(name, flags, *args, **kwargs):
+            if Path(name) == path and not changed:
+                changed.append(True); os.replace(replacement, path)
+            return original(name, flags, *args, **kwargs)
+        with patch.object(module.os, 'open', replace_before_open):
+            with self.assertRaises(ProductError) as failure:
+                module.read_bytes(path)
+        self.assertEqual(failure.exception.code, 'folder_partial_file')
+        self.assertEqual(path.read_bytes(), b'replaced')
+
+    def test_stable_read_rejects_actual_inplace_write_during_read(self):
+        path = self.base / 'inplace.txt'; path.write_bytes(b'original')
+        before = path.stat(); original = module.os.fstat; calls = []
+        def edit_before_after_stat(fd):
+            calls.append(True)
+            if len(calls) == 2:
+                path.write_bytes(b'MODIFIED')
+                os.utime(path, ns=(before.st_atime_ns, before.st_mtime_ns + 2_000_000_000))
+            return original(fd)
+        with patch.object(module.os, 'fstat', edit_before_after_stat):
+            with self.assertRaises(ProductError) as failure:
+                module.read_bytes(path)
+        self.assertEqual(failure.exception.code, 'folder_partial_file')
+        self.assertEqual(path.read_bytes(), b'MODIFIED')
+
+    def test_stable_read_explicitly_requests_binary_descriptor(self):
+        path = self.base / 'binary.txt'; content = b'one\r\ntwo\x1athree\r'
+        path.write_bytes(content)
+        original = module.os.open
+        binary_flag = getattr(module.os, 'O_BINARY', 0x40000000)
+        observed = []
+        def capture_flags(name, flags, *args, **kwargs):
+            observed.append(flags)
+            forwarded = flags if os.name == 'nt' else flags & ~binary_flag
+            return original(name, forwarded, *args, **kwargs)
+        with patch.object(module.os, 'O_BINARY', binary_flag, create=True), patch.object(module.os, 'open', capture_flags):
+            self.assertEqual(module.read_bytes(path), content)
+        self.assertTrue(observed[0] & binary_flag)
+
+
 if __name__ == '__main__': unittest.main()

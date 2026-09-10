@@ -113,7 +113,8 @@ def atomic(path, data, immutable=False):
 
 def read_bytes(path, maximum=MAX_EVENT_BYTES):
     safe(path)
-    fd = os.open(path, os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0))
+    named_before = os.stat(path, follow_symlinks=False)
+    fd = os.open(path, os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0) | getattr(os, 'O_BINARY', 0))
     try:
         info = os.fstat(fd)
         if not stat.S_ISREG(info.st_mode) or info.st_size > maximum:
@@ -125,7 +126,14 @@ def read_bytes(path, maximum=MAX_EVENT_BYTES):
         after = os.fstat(fd)
         named = os.stat(path, follow_symlinks=False)
         stamp = lambda value: (value.st_dev, value.st_ino, value.st_size, value.st_mtime_ns, value.st_ctime_ns)
-        if stamp(info) != stamp(after) or stamp(after) != stamp(named) or len(result) != after.st_size:
+        # Windows path stat preserves creation-time ctime for compatibility,
+        # while fstat may expose ChangeTime. Compare timestamps within the same
+        # API only; device/file ID and size still bind the open descriptor to the
+        # checked pathname. The initial pathname check also catches replacement
+        # between inspection and open, even when replacement bytes have equal size.
+        file_identity = lambda value: (value.st_dev, value.st_ino, value.st_size)
+        if (stamp(info) != stamp(after) or stamp(named_before) != stamp(named)
+                or file_identity(after) != file_identity(named) or len(result) != after.st_size):
             fail('partial_file', 'File changed while being read; defer until stable local bytes are available.', 4)
         return result
     finally:

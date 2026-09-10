@@ -28,6 +28,12 @@ elif action == 'attach':
     folder.Folder.attach(project, state, 'process-b', 'Fixture user', 'Fixture agent', identity)
 elif action == 'sync':
     folder.Folder(project,state).sync()
+elif action == 'pause-migration':
+    from shared_workspace import folder_migration
+    def pause(*args):
+        os._exit(87)
+    folder_migration.verify_recovery = pause
+    folder_migration.migrate(Path(project), Path(state), Path(state).parent/'backup', apply=True)
 '''
 
 
@@ -41,10 +47,11 @@ class FolderProcessTests(unittest.TestCase):
         if build.returncode:
             raise AssertionError(build.stdout + build.stderr)
 
-    def cli(self, command, *args):
+    def cli(self, command, *args, expected=0):
         value = subprocess.run([sys.executable, str(self.package), command, *map(str,args)], capture_output=True, text=True, timeout=60)
-        self.assertEqual(value.returncode, 0, value.stdout + value.stderr)
-        return json.loads(value.stdout)['data']
+        self.assertEqual(value.returncode, expected, value.stdout + value.stderr)
+        response = json.loads(value.stdout)
+        return response['data'] if expected == 0 else response
 
     def crash(self, project, state, action, boundary):
         value = subprocess.run([sys.executable, '-c', WORKER, str(self.package), str(project), str(state), action, boundary], capture_output=True, text=True, timeout=60)
@@ -74,6 +81,38 @@ class FolderProcessTests(unittest.TestCase):
             self.assertEqual(result['readiness'],'ready')
             self.assertEqual(json.loads((state/'folder.json').read_text())['author']['actor'],'process-b')
             self.assertEqual((project/'Note.md').read_text(),'Original\n')
+
+    def test_newer_work_can_explicitly_replan_a_pre_cutover_migration(self):
+        with tempfile.TemporaryDirectory(prefix='folder-process-replan-') as temporary:
+            root=Path(temporary).resolve(); project=root/'project';project.mkdir();state=root/'private'
+            (project/'Note.md').write_text('Original\n')
+            self.cli('setup',project,'--state-dir',state,'--workflow','coordinator','--actor','owner')
+            self.crash(project,state,'pause-migration','unused')
+            journal=(state/'folder-migration.json').read_bytes()
+            self.assertEqual(json.loads(journal)['status'],'backed_up')
+            marker=project/'.shared-memory.json'; original_marker=marker.read_bytes()
+            for field,value in [('format_version',3),('protocol',99),('provider','nextcloud')]:
+                altered=json.loads(original_marker);altered[field]=value;marker.write_text(json.dumps(altered))
+                refused=self.cli('migrate-folder',project,'--state-dir',state,'--backup-dir',root/'fresh-backup','--replan','--apply',expected=4)
+                self.assertEqual(refused['code'],'migration_replan')
+                self.assertEqual((state/'folder-migration.json').read_bytes(),journal)
+                self.assertFalse((root/'fresh-backup').exists())
+                self.assertFalse((state/'folder-migration-intents').exists())
+                marker.write_bytes(original_marker)
+            newest=b'Preserve newer offline work\r\n';(project/'Note.md').write_bytes(newest)
+            refused=self.cli('migrate-folder',project,'--state-dir',state,'--backup-dir',root/'backup','--apply',expected=4)
+            self.assertEqual(refused['code'],'migration_local_changed')
+            plan=self.cli('migrate-folder',project,'--state-dir',state,'--backup-dir',root/'fresh-backup','--replan')
+            self.assertFalse(plan['applied']);self.assertTrue(plan['replanned'])
+            self.assertEqual((state/'folder-migration.json').read_bytes(),journal)
+            self.assertFalse((root/'fresh-backup').exists())
+            migrated=self.cli('migrate-folder',project,'--state-dir',state,'--backup-dir',root/'fresh-backup','--replan','--apply')
+            self.assertTrue(migrated['migrated'])
+            self.assertEqual((project/'Note.md').read_bytes(),newest)
+            self.assertTrue((root/'backup/coordinator.sqlite3').exists())
+            self.assertIn(journal,[p.read_bytes() for p in (state/'folder-migration-intents').glob('*.json')])
+            rejected=self.cli('migrate-folder',project,'--state-dir',state,'--backup-dir',root/'third-backup','--replan','--apply',expected=4)
+            self.assertEqual(rejected['code'],'migration_replan')
 
 
 if __name__ == '__main__':

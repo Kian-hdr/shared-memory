@@ -2,11 +2,18 @@
 
 ## 0.3.0 evidence boundary
 
+The first candidate `d440e87` was withheld after Windows CI exposed incompatible
+path-stat versus descriptor-stat timestamp semantics and text-mode newline
+translation in migration backups. These are runtime portability issues, not skipped
+acceptance gates. The corrected implementation retains same-API stability and file
+identity checks, uses binary reads/copies, and adds direct regressions. Final
+cross-platform results must refer to the corrected source, not this failed candidate.
+
 Verified locally on 2026-09-10: the full Python 3.13 product suite collected
-444 tests, with 424 passed and 20 platform-specific skips. All 32 focused folder
+449 tests, with 429 passed and 20 platform-specific skips. All 36 focused folder
 engine cases passed on both Python 3.12 and 3.13 without skips. Seven packaged CLI
 cases cover the direct default, separate-device setup, read-only refusal and
-recoverable migration, including refusal of a changed recovery archive. Two
+recoverable migration, including refusal of a changed recovery archive. Three
 packaged process-recovery tests exercise multiple real initialization/attach exits.
 Independent probes verified protected-subtree exclusion, read-only evacuation
 recovery, migration interruption and backup tamper refusal. A separate skill

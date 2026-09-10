@@ -92,6 +92,7 @@ class FolderCLITests(unittest.TestCase):
     def test_migration_preserves_newer_notes_uuid_and_complete_private_history(self):
         db = self.legacy()
         old = hashlib.sha256(db.read_bytes()).hexdigest()
+        old_manifest = (self.project / '.shared-memory.json').read_bytes()
         meta = json.loads((self.project / '.shared-memory.json').read_text())
         newer = b'# Note\r\nNewer direct edit\r\n'
         (self.project / 'Note.md').write_bytes(newer)
@@ -101,6 +102,7 @@ class FolderCLITests(unittest.TestCase):
         report = self.cli('migrate-folder', self.project, '--state-dir', self.state, '--backup-dir', backup, '--apply')
         self.assertTrue(report['history_preserved'])
         self.assertEqual(report['project_id'], meta['project_id'])
+        self.assertEqual((backup / 'manifest.json').read_bytes(), old_manifest)
         self.assertEqual((self.project / 'Note.md').read_bytes(), newer)
         self.assertEqual(hashlib.sha256(db.read_bytes()).hexdigest(), old)
         with sqlite3.connect(backup / 'coordinator.sqlite3') as connection:

@@ -40,6 +40,7 @@ def add_commands(commands):
         if name == 'migrate-folder':
             command.add_argument('--backup-dir', required=True, help='Fresh private recovery directory outside shared storage')
             command.add_argument('--apply', action='store_true')
+            command.add_argument('--replan', action='store_true', help='Preserve a superseded pre-cutover intent and use a fresh backup after newer work')
         if name == 'watch':
             command.add_argument('--interval', type=float, default=5)
             command.add_argument('--cycles', type=int, default=12, help='Bounded sync cycles; restart explicitly if more are needed')
@@ -159,7 +160,7 @@ def dispatch(bundle, args):
     state = state_path(args, root)
     if args.command == 'migrate-folder':
         from .folder_migration import migrate
-        return migrate(root, state, args.backup_dir, apply=args.apply)
+        return migrate(root, state, args.backup_dir, apply=args.apply, replan=args.replan)
     folder = Folder(root, state)
     command = args.command
     if command in {'folder-status', 'status', 'receipt', 'team-status', 'provider-check'}:
