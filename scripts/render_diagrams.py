@@ -1,10 +1,39 @@
 #!/usr/bin/env python3
-"""Render the editable Mermaid sources. Requires Mermaid CLI 11.17.0 and Chrome."""
+"""Generate/check Markdown diagrams; SVG rendering needs Mermaid CLI 11.17.0."""
 import argparse
 import json
 from pathlib import Path
+import re
 import subprocess
 import tempfile
+
+
+def generated_markdown(document, sources):
+    """Replace only named generated regions; preserve captions and fallbacks."""
+    names = [source.name for source in sources]
+    if not names:
+        raise ValueError('No Mermaid sources found')
+    for kind in ('BEGIN', 'END'):
+        found = re.findall(r'<!-- ' + kind + r' GENERATED MERMAID: ([^\n]+) -->', document)
+        if sorted(found) != sorted(names):
+            raise ValueError(f'Expected exactly one {kind} marker for each Mermaid source')
+    replacements = []
+    for source in sources:
+        text = source.read_bytes().decode('utf-8')
+        if not text.endswith('\n') or '```' in text:
+            raise ValueError(f'{source.name}: use newline-terminated Mermaid without Markdown fences')
+        begin = f'<!-- BEGIN GENERATED MERMAID: {source.name} -->'
+        end = f'<!-- END GENERATED MERMAID: {source.name} -->'
+        start, stop = document.index(begin), document.index(end) + len(end)
+        if stop <= start:
+            raise ValueError(f'{source.name}: reversed generated markers')
+        replacements.append((start, stop, f'{begin}\n```mermaid\n{text}```\n{end}'))
+    ranges = sorted(replacements)
+    if any(left[1] > right[0] for left, right in zip(ranges, ranges[1:])):
+        raise ValueError('Generated Mermaid regions overlap')
+    for start, stop, block in reversed(ranges):
+        document = document[:start] + block + document[stop:]
+    return document
 
 
 def main():
@@ -13,8 +42,30 @@ def main():
     parser.add_argument('--chrome', help='Optional existing Chrome/Chromium executable')
     parser.add_argument('--output-dir', type=Path, help='Defaults to assets/diagrams')
     parser.add_argument('--png-dir', type=Path, help='Optional local visual-review previews')
+    markdown = parser.add_mutually_exclusive_group()
+    markdown.add_argument('--check-markdown', action='store_true',
+                          help='Check generated blocks against .mmd sources; no Node/browser or writes')
+    markdown.add_argument('--update-markdown', action='store_true',
+                          help='Regenerate Markdown blocks only; no Node/browser needed')
     args = parser.parse_args()
     sources = Path(__file__).resolve().parents[1] / 'assets' / 'diagrams'
+    source_files = sorted(sources.glob('*.mmd'))
+    guide = sources.parents[1] / 'docs' / 'DIAGRAMS.md'
+    original = guide.read_bytes().decode('utf-8')
+    try:
+        updated = generated_markdown(original, source_files)
+    except ValueError as exc:
+        parser.error(str(exc))
+    if args.check_markdown:
+        if original != updated:
+            parser.error('Generated Mermaid blocks differ; run --update-markdown')
+        print(f'Checked {len(source_files)} generated Mermaid blocks; no files changed')
+        return 0
+    if args.update_markdown:
+        if original != updated:
+            guide.write_bytes(updated.encode('utf-8'))
+        print(f'Updated {len(source_files)} generated Mermaid blocks')
+        return 0
     destination = args.output_dir or sources
     destination.mkdir(parents=True, exist_ok=True)
     if args.png_dir:
@@ -26,7 +77,7 @@ def main():
         tmp = Path(temporary)
         browser = tmp / 'browser.json'
         browser.write_text(json.dumps({'executablePath': args.chrome} if args.chrome else {}))
-        for source in sorted(sources.glob('*.mmd')):
+        for source in source_files:
             config = tmp / 'mermaid.json'
             config.write_text(json.dumps({
                 'theme': 'base', 'securityLevel': 'strict', 'htmlLabels': False,
@@ -47,6 +98,8 @@ def main():
             if args.png_dir:
                 subprocess.run(command + ['-o', str(args.png_dir / (source.stem + '.png')),
                                            '-s', '1.5'], check=True)
+    if original != updated:
+        guide.write_bytes(updated.encode('utf-8'))
     return 0
 
 

@@ -48,6 +48,8 @@ jobs:
           python-version: ${{ matrix.python }}
       - name: Stage hash-pinned rclone for local delivery fixtures
         run: python scripts/prepare_rclone_fixture.py --output "${{ runner.temp }}/rclone-fixture" --github-path
+      - name: Check generated Mermaid documentation against editable sources
+        run: python scripts/render_diagrams.py --check-markdown
       - run: python -m unittest discover -s product/tests -v
       - name: Build exact product candidate
         run: python scripts/build_product.py --output "${{ runner.temp }}/shared-memory.pyz"

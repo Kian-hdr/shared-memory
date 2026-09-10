@@ -14,6 +14,12 @@ forward test executed 15 real CLI calls with synthetic local copies and no
 coordinator or approval operations. Those development-package checks do not claim
 an anonymously downloaded final release until its separate verification is recorded.
 
+Actual Mac filesystem probes also passed eight packaged operations each in
+Google Drive, OneDrive and iCloud local folders, preserving synthetic siblings,
+settings and exact note bytes. These 24 calls exercised local filesystem behavior
+only; they did not verify server readback, another device or provider delivery.
+No local Nextcloud route was available.
+
 Four Mermaid diagrams passed real Mermaid CLI 11.17.0 rendering, visual inspection,
 SVG/XML accessibility and link checks. The renderer and editable sources are
 version-controlled; figure rendering is not provider acceptance evidence.
