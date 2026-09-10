@@ -8,7 +8,7 @@ import subprocess
 import tempfile
 
 
-def generated_markdown(document, sources):
+def generated_markdown(document, sources, *, native_theme=False):
     """Replace only named generated regions; preserve captions and fallbacks."""
     names = [source.name for source in sources]
     if not names:
@@ -20,6 +20,10 @@ def generated_markdown(document, sources):
     replacements = []
     for source in sources:
         text = source.read_bytes().decode('utf-8')
+        if native_theme:
+            # Keep the shared graph, but let GitHub choose light/dark presentation.
+            text = ''.join(line for line in text.splitlines(keepends=True)
+                           if not re.match(r'^\s*class(?:Def)?\s', line))
         if not text.endswith('\n') or '```' in text:
             raise ValueError(f'{source.name}: use newline-terminated Mermaid without Markdown fences')
         begin = f'<!-- BEGIN GENERATED MERMAID: {source.name} -->'
@@ -51,20 +55,25 @@ def main():
     sources = Path(__file__).resolve().parents[1] / 'assets' / 'diagrams'
     source_files = sorted(sources.glob('*.mmd'))
     guide = sources.parents[1] / 'docs' / 'DIAGRAMS.md'
+    readme = sources.parents[1] / 'README.md'
     original = guide.read_bytes().decode('utf-8')
+    original_readme = readme.read_bytes().decode('utf-8')
     try:
         updated = generated_markdown(original, source_files)
+        updated_readme = generated_markdown(original_readme, source_files, native_theme=True)
     except ValueError as exc:
         parser.error(str(exc))
     if args.check_markdown:
-        if original != updated:
+        if original != updated or original_readme != updated_readme:
             parser.error('Generated Mermaid blocks differ; run --update-markdown')
-        print(f'Checked {len(source_files)} generated Mermaid blocks; no files changed')
+        print(f'Checked {len(source_files) * 2} generated Mermaid blocks in README and guide; no files changed')
         return 0
     if args.update_markdown:
         if original != updated:
             guide.write_bytes(updated.encode('utf-8'))
-        print(f'Updated {len(source_files)} generated Mermaid blocks')
+        if original_readme != updated_readme:
+            readme.write_bytes(updated_readme.encode('utf-8'))
+        print(f'Updated {len(source_files) * 2} generated Mermaid blocks in README and guide')
         return 0
     destination = args.output_dir or sources
     destination.mkdir(parents=True, exist_ok=True)
@@ -100,6 +109,8 @@ def main():
                                            '-s', '1.5'], check=True)
     if original != updated:
         guide.write_bytes(updated.encode('utf-8'))
+    if original_readme != updated_readme:
+        readme.write_bytes(updated_readme.encode('utf-8'))
     return 0
 
 

@@ -10,8 +10,10 @@ The `.mmd` files are the editable source of truth. The Mermaid blocks below and
 SVG fallbacks are generated from those same files. GitHub and Mermaid-enabled
 Obsidian views can render the fenced blocks directly; other readers can use the
 SVGs. Edit the `.mmd` source and regenerate, rather than editing a generated block.
-README and other guides should embed the SVGs and link here instead of keeping
-another independently maintained Mermaid copy.
+The README also uses generated Mermaid blocks, with fixed color classes omitted
+so GitHub can choose light or dark presentation. The checker verifies both the
+README and this guide against the same `.mmd` sources. SVGs remain optional image
+fallbacks; do not maintain independent copies of the diagrams.
 
 ## 1. Separate local copies, one selected project
 
@@ -214,7 +216,7 @@ readable text, clipping, arrow direction and faithful boundaries after changing 
 source. Font/browser differences can affect layout; generated output is reviewed
 artwork, not a promise of identical bytes on every renderer host.
 
-For a README overview, use the existing source and export:
+For a surface that needs an image fallback, use the existing export:
 
 ```markdown
 ![Shared project copies for people and agents](assets/diagrams/01-shared-folder.svg)
