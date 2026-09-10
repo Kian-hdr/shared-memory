@@ -1,5 +1,6 @@
 """Packaged direct-folder onboarding and historical-authority migration."""
 from pathlib import Path
+from contextlib import closing
 import hashlib
 import json
 import shutil
@@ -105,7 +106,7 @@ class FolderCLITests(unittest.TestCase):
         self.assertEqual((backup / 'manifest.json').read_bytes(), old_manifest)
         self.assertEqual((self.project / 'Note.md').read_bytes(), newer)
         self.assertEqual(hashlib.sha256(db.read_bytes()).hexdigest(), old)
-        with sqlite3.connect(backup / 'coordinator.sqlite3') as connection:
+        with closing(sqlite3.connect(backup / 'coordinator.sqlite3')) as connection:
             self.assertEqual(connection.execute('PRAGMA integrity_check').fetchone()[0], 'ok')
         self.assertFalse(list(self.project.rglob('*.sqlite3')))
         self.assertTrue((self.state / 'member.token').exists())
