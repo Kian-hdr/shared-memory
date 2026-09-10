@@ -35,7 +35,8 @@ jobs:
 
   product:
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
+    # Windows runs hundreds of real-process/fsync tests plus packaged rehearsals.
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
