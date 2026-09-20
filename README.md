@@ -4,7 +4,7 @@
 
 **Shared notes for people and AI agents. Edit them normally.**
 
-Shared Memory 0.3.0 works in an ordinary Markdown folder. People and agents save
+Shared Memory 0.4.0 works in an ordinary Markdown folder. People and agents save
 changes directly, including offline. Your chosen folder provider transports the
 files when connected; Shared Memory records changes and reconciles the history it
 can see. Optional reviews happen after editing. A designated integrator, approval
@@ -13,6 +13,25 @@ queue or always-online reviewer is not required.
 Obsidian is optional. One shared project subfolder can live inside an existing
 private vault. The enclosing vault, private notes and settings stay outside that
 project's boundary.
+
+## Small context, ordinary tools
+
+Read INDEX.md and only relevant notes. Use your agent's native file tools. Shared
+Memory does not need an API key, model-specific scripts or a large MCP tool catalog.
+An optional [local capture job](docs/AUTOMATIC-CAPTURE.md) records history outside
+the model, so ordinary edits need no shell call and consume no model tokens for sync.
+Without it, use `shared-memory sync PROJECT --brief` once after edits. A capture
+failure leaves saved Markdown usable; diagnose once instead of retrying in a loop.
+
+Empty new workspaces receive **Raw/** (sources), **Wiki/** (canonical memory),
+**Output/** (deliverables), **AGENTS.md** and **INDEX.md**. Existing folders keep their
+structure and instructions. Untracked linked archive directories are skipped safely;
+links replacing tracked notes or project/state boundaries are still rejected.
+Untracked nonportable filenames are preserved locally and reported as excluded from
+history; tracked names remain strict.
+
+[Agent compatibility and evidence](docs/AGENT-COMPATIBILITY.md) ·
+[Set up or update](SETUP-PROMPT.md)
 
 <!-- BEGIN GENERATED MERMAID: 01-shared-folder.mmd -->
 ```mermaid
@@ -43,7 +62,7 @@ settings stay outside the exchange; there is no approval queue between agents.
 
 ## Get started
 
-1. [Paste the v0.3.0 setup / upgrade prompt](SETUP-PROMPT.md) into an agent connected to your computer.
+1. [Paste the v0.4.0 setup / upgrade prompt](SETUP-PROMPT.md) into an agent connected to your computer.
 2. Select the folder and use its existing sharing provider, if any.
 3. Let the agent finish setup, then edit your notes normally.
 
@@ -52,10 +71,10 @@ required. For another person, grant the intended folder access through your chos
 provider and have their agent set up that local copy. Each computer keeps its own
 private baseline. Do not copy another person's private state.
 
-[Release v0.3.0](https://github.com/Kian-hdr/shared-memory/releases/tag/v0.3.0) is the
+[Release v0.4.0](https://github.com/Kian-hdr/shared-memory/releases/tag/v0.4.0) is the
 version-specific download location. The setup prompt includes direct asset links
 and the runtime SHA-256; verify the download against the release
-`SHA256SUMS` before execution. The runtime is `shared-memory-0.3.0.pyz`; the matching full kit,
+`SHA256SUMS` before execution. The runtime is `shared-memory-0.4.0.pyz`; the matching full kit,
 setup prompt, optional skill and icons are separate assets. A download does not grant
 access to another person's folders.
 

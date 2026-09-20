@@ -61,6 +61,53 @@ class FolderCLITests(unittest.TestCase):
         self.assertEqual((self.project / 'image.bin').read_bytes(), b'\x00\xff')
         self.setup('--provider', 'onedrive', expected=3)
 
+    def test_empty_workspace_gets_portable_memory_layers_and_initial_history(self):
+        empty = self.base / 'New workspace'
+        empty.mkdir()
+        first = self.setup(project=empty)
+        expected = {'AGENTS.md', 'INDEX.md', 'Raw/README.md', 'Wiki/README.md', 'Output/README.md'}
+        self.assertEqual({p.relative_to(empty).as_posix() for p in empty.rglob('*.md')}, expected)
+        self.assertEqual(first['readiness'], 'ready')
+        events = self.cli('history', empty, '--state-dir', self.state)['events']
+        self.assertEqual(len(events), 1)
+        self.assertEqual(set(events[0]['changes']), expected)
+        (empty / 'AGENTS.md').write_text('User instructions remain authoritative.\n')
+        resumed = self.setup(project=empty)
+        self.assertEqual(resumed['project_id'], first['project_id'])
+        self.assertEqual((empty / 'AGENTS.md').read_text(), 'User instructions remain authoritative.\n')
+
+    def test_existing_hierarchy_and_hidden_content_do_not_trigger_scaffolding(self):
+        for index, name in enumerate(('Existing/child', '.obsidian', 'Wiki')):
+            selected = self.base / f'Existing-{index}'
+            (selected / name).mkdir(parents=True)
+            self.setup(project=selected, state=self.base / f'state-{index}')
+            self.assertTrue((selected / name).is_dir())
+            self.assertFalse((selected / 'AGENTS.md').exists())
+            self.assertFalse((selected / 'INDEX.md').exists())
+            self.assertFalse((selected / 'Raw').exists())
+            self.assertFalse((selected / 'Output').exists())
+
+    def test_join_restores_memory_layer_notes_from_delivered_history(self):
+        empty = self.base / 'New workspace'
+        empty.mkdir()
+        first = self.setup(project=empty)
+        received = self.base / 'Receiving workspace'
+        shutil.copytree(empty, received)
+        # Disposable fixtures model provider delivery of history before live notes.
+        for path in received.rglob('*.md'):
+            path.unlink()
+        joined = self.setup(project=received, state=self.base / 'receiver-state',
+                            *('--expected-project-id', first['project_id']))
+        self.assertEqual(joined['route'], 'join_folder')
+        self.assertEqual(joined['readiness'], 'ready')
+        self.assertEqual((received / 'Wiki/README.md').read_bytes(), (empty / 'Wiki/README.md').read_bytes())
+
+    def test_readonly_empty_setup_does_not_write_scaffolding(self):
+        empty = self.base / 'Read-only new workspace'
+        empty.mkdir()
+        self.setup('--read-only', project=empty, expected=4)
+        self.assertEqual(list(empty.iterdir()), [])
+
     def test_another_device_joins_without_member_token_or_coordinator(self):
         first = self.setup('--actor', 'a', '--provider', 'nextcloud')
         remote = self.base / 'Another vault/Selected folder'

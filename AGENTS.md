@@ -1,64 +1,33 @@
-# Shared Memory: project instructions
+# Shared Memory
 
-Use the current user's scope and the selected project's existing instructions.
-Shared Memory 0.3.0 defaults to ordinary direct Markdown editing. Obsidian is
-optional, and the selected folder may be one subfolder inside a private vault.
-Do not promote the selected scope to the whole vault or infer sharing permissions.
+Use the selected project's instructions and current user scope. Read its index and
+relevant notes only. Ordinary memory uses native Markdown reads/edits; Obsidian is
+optional. Keep setup, diagnostics and historical workflows out of routine context.
 
-## Start from the actual project
+Folder mode permits direct/offline editing without leases, proposals or an online
+reviewer. Configured automatic capture records history independently of the model;
+otherwise sync once after edits/provider arrivals. If capture fails, preserve saved
+notes and report the gap once. Do not invent scripts or repeatedly retry setup.
 
-Read the existing home/index and relevant canonical notes. Identify the installed
-runtime and project format before commands. Preserve instructions, private parents,
-settings, attachments and nested project trackers. Source/download folders are not
-automatically the project to configure. Read only the context needed for the task.
+Preserve project identity/history, existing instructions, hierarchy, attachments,
+unrelated changes and nested project boundaries. Coordinate overlapping edits.
+Retain conflicts; resolve factual disagreements against evidence. Record explicit
+rename/delete intentions and validate links; missing files alone are not deletions.
 
-## Work directly in folder mode
+Choose one provider per folder. Keep private baselines, credentials, recovery and
+SQLite outside shared storage. Scope never expands to parents or new recipients.
+Respect read-only grants, confidentiality and mandatory OS/authentication controls.
+Local capture is not provider delivery or proof of independent recipient receipt.
 
-People and agents may save authorized edits directly, including offline. Normal
-folder work does not require a lease, proposal submission, integrator acceptance or
-an always-online reviewer. Optional after-edit reviews should identify their scope,
-evidence and unresolved issues; never label unreviewed work automatically approved.
+New empty projects use Raw/Wiki/Output; never reorganize populated folders during
+setup. Update existing canonical notes with durable decisions and provenance.
+Formats 1/2 retain their historical workflow until an explicit backed-up migration;
+never reset their authority or treat pending work as accepted. Legacy trackers remain
+separate. Consult docs/PRODUCT-V1.md or the relevant reference only when needed.
 
-Coordinate overlapping work with other active editors when practical. Shared history
-records changes, but neither it nor a provider sync client excludes arbitrary writes
-by an editor. Run the installed `sync` after editing and after provider files arrive.
-Saving files persists locally; history capture waits for sync when no agent or
-scheduled process is running. Do not claim continuous awareness of another computer.
-
-Preserve competing versions and provider conflict copies. Compatible text may merge;
-contradictions in meaning need deliberate review. Use explicit conflict resolution
-with evidence and the rights held by the current editor. An explicit read-only role
-or provider ACL remains effective. Record intended deletions and renames through the
-folder commands, and validate affected links. Never remove history or backups merely
-to make status look clean.
-
-## Keep the storage boundary clear
-
-Choose one provider per shared folder. Shared portable history belongs with the
-folder; private baselines, credentials and recovery inputs remain on the user's own
-computer outside synchronization roots. Do not sync SQLite, cookies, access tokens,
-agent session transcripts or private keys. Name-based exclusions are not a guarantee
-that arbitrary Markdown contains no secrets. Share only the intended folder/content.
-
-Keep substantive knowledge in canonical notes. Link evidence and work records where
-useful; do not fabricate relationships or create duplicate narrative status logs.
-Retain frontmatter, links, formatting and exact original bytes when no change is
-required. Obsidian is an optional editor, not an installation or vault-registration
-requirement for normal setup.
-
-## Respect existing workflow formats
-
-Existing format-1/2 projects use the historical coordinator. Do not apply direct
-folder commands to them or reinterpret their pending proposals as accepted. Use an
-explicit backed-up migration when changing workflows. `setup --workflow coordinator`
-retains the older route when requested; its own session/claim/acceptance rules apply.
-Independent nested legacy trackers keep their own authority and history. A root
-folder operation does not acquire their claims or migrate their records.
-
-## Complete the requested work
-
-Follow existing task authorization without repeated discretionary permission requests.
-Preserve explicit limits, confidentiality, budgets and mandatory platform controls.
-Keep deletion recoverable and prepare a narrow backup when replacing meaningful work.
-Report what changed, what was checked and any actual limitation. Distinguish local
-history/status, provider delivery, independent recipient receipt and human review.
+For development, preserve recoverable originals and test relevant changes. The
+product supports Python 3.11+ across macOS/Linux/Windows; platform-specific helpers
+must be labeled and import safely elsewhere. Build with scripts/build_product.py;
+run product/tests, relevant toolkit checks and documentation validation. Release
+assets must come from the exact clean committed source via scripts/build_release.py.
+Report checked behavior and remaining limits; never label unreviewed work approved.

@@ -14,6 +14,84 @@ COMMANDS = ('sync', 'folder-status', 'history', 'resolve', 'delete', 'rename', '
 FOLDER_PROVIDERS = ('local', 'google-drive', 'icloud', 'onedrive', 'nextcloud', 'self-hosted')
 
 
+def new_workspace_files(root):
+    """Seed only an empty selected folder; never classify or move existing work.
+
+    The normal initialization intent, immutable event and materialization journal
+    make these files recoverable across interrupted setup and provider delivery.
+    Even hidden files or empty user folders mean this is an existing workspace.
+    """
+    if any(root.iterdir()):
+        return None
+    return {
+        'AGENTS.md': '''# Shared workspace
+
+Read INDEX.md, then only the Wiki pages relevant to the task. Search by topic/path;
+read bounded sections before whole files. Do not load the entire workspace.
+
+- Raw/: original, unprocessed sources. Read only when needed; retain useful evidence.
+- Wiki/: canonical knowledge, decisions and current project state. Update existing
+  notes after durable discoveries or changes; preserve dates, sources and uncertainty.
+- Output/: generated deliverables. Link durable conclusions from their Wiki note.
+
+Keep INDEX.md short. Preserve existing hierarchy, attachments, instructions and
+unrelated edits. Coordinate overlapping writes; retain competing versions. Record
+explicit renames/deletions through Shared Memory and check links. Missing files alone
+are not deletion. A clean text merge does not establish factual agreement.
+
+Use native file tools to read and edit. Configured automatic capture records history
+outside the agent; otherwise use the installed shared-memory command once after edits.
+If unavailable or failing, keep the saved notes and report the capture gap once.
+Do not invent scripts, reinstall, or repeatedly retry during ordinary note work.
+
+Keep private state, credentials and recovery outside shared storage. Respect selected
+folder scope, confidentiality, read-only grants and OS/provider controls. One provider
+per folder; local capture does not prove remote delivery. Preserve .shared-memory/
+and .shared-memory.json. For substantive work, leave a concise Current handoff in
+the existing project note: result, evidence, blockers and next steps.
+''',
+        'INDEX.md': '''# Workspace index
+
+Read [[AGENTS]] first, then use this routing map.
+
+| Need | Location |
+| --- | --- |
+| Unprocessed information and original sources | [[Raw/README|Raw/]] |
+| Durable knowledge, decisions and project state | [[Wiki/README|Wiki/]] |
+| Substantial generated deliverables | [[Output/README|Output/]] |
+
+## Canonical pages and projects
+
+No project or domain pages have been created yet. Add links to important canonical
+pages here as the workspace grows, following the established Wiki hierarchy.
+Retrieve relevant Wiki pages first; inspect Raw sources only when necessary.
+''',
+        'Raw/README.md': '''# Raw
+
+Inbox for unprocessed information and original source material. Extract useful
+durable knowledge into the appropriate existing Wiki page, preserving provenance.
+Keep sources unless there is a clear, authorized reason to archive or remove them.
+See [[INDEX]] for routing and [[AGENTS]] for the shared workflow.
+''',
+        'Wiki/README.md': '''# Wiki
+
+Canonical long-term memory: projects, people, companies, research, technical
+documentation, decisions, processes and current project state. Build on existing
+pages and preserve the hierarchy as it develops. Substantial generated deliverables
+belong in Output/; record their durable conclusions here with a source link.
+See [[INDEX]] for routing and [[AGENTS]] for the shared workflow.
+''',
+        'Output/README.md': '''# Output
+
+Default location for substantial generated deliverables: reports, briefings,
+applications, drafts, presentations and other finished artifacts. Create useful
+subfolders as needed. Update the relevant Wiki page when work establishes durable
+knowledge, decisions, status changes or next steps. Wiki/ remains authoritative.
+See [[INDEX]] for routing and [[AGENTS]] for the shared workflow.
+''',
+    }
+
+
 def add_commands(commands):
     for name in COMMANDS:
         command = commands.add_parser(name, help={
@@ -26,7 +104,9 @@ def add_commands(commands):
             'migrate-folder': 'Plan or apply a backed-up migration from historical coordinator mode',
             'watch': 'Optional local history capture loop; no background AI or approval service',
         }[name])
-        command.add_argument('project')
+        command.add_argument('project', nargs='?', default='.', help='Selected folder; defaults to current directory')
+        if name != 'migrate-folder':
+            command.add_argument('--brief', action='store_true', help='Bounded summary without full per-note heads or excluded paths')
         command.add_argument('--state-dir', help='Existing private per-device state; otherwise discovered locally')
         if name in {'history', 'resolve', 'delete'}:
             command.add_argument('--path', required=name != 'history')
@@ -144,8 +224,10 @@ def setup(args):
                 raise ProductError(4, 'folder_not_delivered', 'Expected project metadata/history has not arrived. Do not create a new project identity.')
             if any((base / name).exists() for base in (state, state.parent) for name in ('connection.json', 'setup-intent.json')):
                 raise ProductError(4, 'existing_history', 'Existing private coordinator history needs reviewed migration, not fresh setup.')
+            seeds = new_workspace_files(root) if not pending else None
             folder = Folder.initialize(root, state, provider=args.provider or (pending['provider'] if pending else 'local'), readonly=readonly,
-                                       project_id=pending['project_id'] if pending else None, **identity)
+                                       project_id=pending['project_id'] if pending else None,
+                                       initial_files=seeds, materialize_initial=seeds is not None, **identity)
             route = 'new_folder'
     result = folder.status()
     return {'workflow': 'folder', 'route': route, 'project_id': result['project_id'],
@@ -189,3 +271,32 @@ def dispatch(bundle, args):
                 time.sleep(args.interval)
         return {'cycles': args.cycles, 'last': result, 'background_agent': False}
     raise ProductError(2, 'usage_error', 'Unknown folder command.')
+
+
+def brief(data):
+    """Bound routine output while preserving every actionable condition count."""
+    result = {key: data[key] for key in (
+        'project_id', 'workflow', 'readiness', 'readonly', 'provider_delivery',
+        'event_count', 'recovery_pending') if key in data}
+    if data.get('skipped_paths', {}).get('count'):
+        result['skipped_paths'] = data['skipped_paths']
+    if 'heads' in data:
+        result['tracked_files'] = len(data['heads'])
+    fields = ('conflicts', 'deferred_events', 'invalid_events', 'missing_files',
+              'local_changes', 'partial_files', 'excluded', 'path_collisions',
+              'history_copies', 'rename_divergences', 'provider_conflict_copies',
+              'deferred_materialization', 'warnings')
+    result['counts'] = {key: len(data[key]) for key in fields if data.get(key)}
+    issues = {key: data[key][:3] for key in fields
+              if key != 'excluded' and data.get(key)}
+    if issues:
+        # Report counts even when unusually large/pathological details are omitted.
+        result['attention'] = {key: [str(item)[:240] for item in values]
+                               for key, values in issues.items()}
+        result['details'] = 'Run the same command without --brief for complete details.'
+    if 'last' in data:
+        result.update(cycles=data['cycles'], last=brief(data['last']))
+    if 'events' in data:
+        result['event_count'] = len(data['events'])
+        result['details'] = 'Run history without --brief to read event contents.'
+    return result

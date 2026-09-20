@@ -72,6 +72,30 @@ class FolderTests(unittest.TestCase):
         self.assertEqual(self.text(one), '世界\r\nMixed\nlast\rno-newline')
         self.assertFalse(any(p.suffix == '.sqlite3' for p in one.root.rglob('*')))
 
+    def test_seed_initialization_resumes_after_journal_crash_without_overwriting_editor(self):
+        root = self.base / 'seeded'; root.mkdir()
+        state = self.base / 'seeded-private'
+        seed = {'AGENTS.md': 'Seed instructions\n', 'Wiki/README.md': 'Canonical memory\n'}
+        atomic = module.atomic
+
+        def interrupted(path, data, immutable=False):
+            atomic(path, data, immutable)
+            if Path(path).name == 'journal.json':
+                raise RuntimeError('simulated power loss after durable journal')
+
+        with patch.object(module, 'atomic', interrupted), self.assertRaises(RuntimeError):
+            Folder.initialize(root, state, 'seed', 'Person', 'Agent',
+                              initial_files=seed, materialize_initial=True)
+        (root / 'AGENTS.md').write_text('Newer user instructions\n')
+        # A retry reads its original durable intent without needing the templates.
+        resumed = Folder.initialize(root, state, 'seed', 'Person', 'Agent')
+        self.assertEqual((root / 'AGENTS.md').read_text(), 'Newer user instructions\n')
+        self.assertEqual((root / 'Wiki/README.md').read_text(), seed['Wiki/README.md'])
+        events = resumed.history('AGENTS.md')['events']
+        preserved = [e['changes'].get('AGENTS.md') for e in events]
+        self.assertIn(seed['AGENTS.md'], preserved)
+        self.assertIn('Newer user instructions\n', preserved)
+
     def test_nextcloud_binding_and_unverified_delivery(self):
         one = self.create(provider='nextcloud')
         self.assertEqual(one.status()['provider'], 'nextcloud')
@@ -251,7 +275,7 @@ class FolderTests(unittest.TestCase):
         self.assertFalse((self.base / 'private2').exists())
         with self.assertRaises(ProductError): Folder(root, root / 'private')
         unsafe = self.base / 'unsafe'; unsafe.mkdir(); (unsafe / 'Note.md').symlink_to(one.root / 'Note.md')
-        with self.assertRaises(ProductError): Folder.initialize(unsafe, self.base / 'unsafe-state', 'a', 'A', 'Agent')
+        with self.assertRaises(ProductError): Folder.initialize(unsafe, self.base / 'unsafe-state', 'a', 'A', 'Agent', initial_files={'Note.md': 'required import'})
         self.assertFalse((self.base / 'unsafe-state').exists())
 
     def test_provider_conflict_copy_is_distinct_preserved_note(self):

@@ -19,7 +19,7 @@ import tempfile
 import uuid
 
 from .errors import ProductError
-from .path_safety import absolute_path, unsafe_ancestor
+from .path_safety import absolute_path, unsafe_ancestor, is_link_or_reparse
 from .engine import validate_path, validate_files, MAX_FILE_BYTES, MAX_SNAPSHOT_BYTES
 from .knowledge import PRIVATE, PRIVATE_FILES
 from .folder_merge import views
@@ -238,7 +238,7 @@ class Folder:
     @classmethod
     @checked
     def initialize(cls, root, state, actor, person, agent, provider='local', project_id=None,
-                   readonly=False, initial_files=None, migration_origin=None):
+                   readonly=False, initial_files=None, migration_origin=None, materialize_initial=False):
         root = safe(Path(root).expanduser()); state = private_path(state, root)
         author = identity(actor, person, agent)
         if readonly:
@@ -287,9 +287,9 @@ class Folder:
                 if any(k.endswith('hash') and (not isinstance(v, str) or not HASH.fullmatch(v)) for k, v in origin.items()):
                     fail('migration', 'Migration digests must be SHA-256 values.')
             intent = {'root': str(root), 'project_id': identifier, 'author': author, 'provider': provider,
-                      'files': files, 'migration_origin': origin}
+                      'files': files, 'migration_origin': origin, 'materialize_initial': materialize_initial}
             atomic(state / 'initialization.json', canonical(intent), immutable=True)
-        manifest = {'format_version': 3, 'product_version': '0.3.0', 'workflow': 'folder',
+        manifest = {'format_version': 3, 'product_version': '0.4.0', 'workflow': 'folder',
                     'project_id': intent['project_id'], 'provider': provider}
         if intent['migration_origin'] is not None:
             manifest['migration_origin'] = intent['migration_origin']
@@ -303,7 +303,12 @@ class Folder:
                 if intent['files']:
                     event = folder._event('initial', intent['files'], {}, 'Initial selected-folder snapshot')
                     event_id = folder._emit(event)
-                    baseline = {p: {'heads': [event_id], 'text': text} for p, text in intent['files'].items()}
+                    # Newly seeded instructions have never existed locally. Leave
+                    # them unobserved until the normal journal materializes them;
+                    # otherwise the provider-missing guard correctly skips them.
+                    # Existing initialization/migration retains its old baseline.
+                    if not intent.get('materialize_initial', False):
+                        baseline = {p: {'heads': [event_id], 'text': text} for p, text in intent['files'].items()}
                 folder._save_baseline(baseline)
         folder.sync()
         return folder
@@ -384,6 +389,7 @@ class Folder:
 
     def _scan(self, required):
         self._excluded, self._partial = [], []
+        self._skipped_paths = {'count': 0, 'samples': []}
         files = {}
         safe(self.root)
         for directory, dirs, names in os.walk(self.root, followlinks=False):
@@ -391,7 +397,11 @@ class Folder:
             for name in list(dirs):
                 relative = (Path(directory) / name).relative_to(self.root).as_posix()
                 reserved = any(part.casefold() == 'coordination' or part.casefold() in PRIVATE or part.startswith('.') for part in Path(relative).parts)
-                if reserved and not any(p.startswith(relative + '/') for p in required):
+                # Archived bundles may contain directory links. Never traverse them,
+                # but reject links replacing managed subtrees rather than treating
+                # those tracked notes as missing and potentially restoring through a link.
+                linked = is_link_or_reparse(Path(directory) / name)
+                if (reserved or linked) and not any(p.startswith(relative + '/') for p in required):
                     dirs.remove(name); self._excluded.append(relative)
                 else:
                     safe(Path(directory) / name)
@@ -399,10 +409,25 @@ class Folder:
                 relative = (Path(directory) / name).relative_to(self.root).as_posix()
                 private_ancestor = any(part.startswith('.') or part.casefold() in PRIVATE or part.casefold() == 'coordination'
                                        for part in Path(relative).parts[:-1])
-                if relative not in required and (private_ancestor or name.startswith('.') or name.casefold() in PRIVATE | PRIVATE_FILES
+                if relative not in required and (is_link_or_reparse(Path(directory) / name)
+                                                or private_ancestor or name.startswith('.') or name.casefold() in PRIVATE | PRIVATE_FILES
                                                 or Path(name).suffix.casefold() not in {'.md', '.markdown'}):
                     self._excluded.append(relative); continue
-                path_name(relative)
+                try:
+                    path_name(relative)
+                except ProductError as exc:
+                    portable_errors = {
+                        'Project paths must use Unicode NFC normalization.',
+                        'Path contains a name unsupported on Windows.',
+                        'Path contains a reserved Windows device name.',
+                    }
+                    if relative in required or exc.code != 'engine_invalid' or str(exc) not in portable_errors:
+                        raise
+                    self._excluded.append(relative)
+                    self._skipped_paths['count'] += 1
+                    if len(self._skipped_paths['samples']) < 3:
+                        self._skipped_paths['samples'].append({'path': relative[:240], 'reason': str(exc)})
+                    continue
                 try:
                     text = self._read(relative)
                     if text is not None:
@@ -703,13 +728,17 @@ class Folder:
         changed = sorted(p for p, text in local.items() if p not in resolved or resolved[p]['conflict'] or resolved[p]['text'] != text)
         collisions = self._path_collisions(resolved)
         rename_divergences = self._rename_divergences(events, resolved)
+        skipped = getattr(self, '_skipped_paths', {'count': 0, 'samples': []})
         copies = sorted(p for p in local if re.search(r'(?i)(conflicted? copy|conflict[- _]|\(.*conflict.*\))', p))
         return {'project_id': self.project_id, 'workflow': 'folder', 'provider': self.manifest['provider'],
                 'readonly': self.config['readonly'], 'readiness': 'ready' if not (conflicts or deferred or invalid or missing or changed or self._partial or collisions) else 'partial',
                 'history_hash': digest(sorted(events)), 'event_count': len(events),
                 'path_collisions': collisions, 'history_copies': getattr(self, '_history_copies', []),
                 'rename_divergences': rename_divergences,
-                'warnings': ([{'code': 'rename_intent_divergence', 'message':
+                'skipped_paths': skipped,
+                'warnings': ([{'code': 'untracked_nonportable_paths', 'message':
+                    str(skipped['count']) + ' untracked paths were excluded from history because their names are not portable; local files remain unchanged.'}]
+                    if skipped['count'] else []) + ([{'code': 'rename_intent_divergence', 'message':
                     'Concurrent renames preserved different destinations. File convergence does not resolve intent; review both copies, then resolve or explicitly delete the source with evidence to acknowledge the chosen outcome.'}]
                     if rename_divergences else []),
                 'heads': {p: v['heads'] for p, v in resolved.items()}, 'conflicts': conflicts,

@@ -1,4 +1,4 @@
-# Shared Memory 0.3.0 operating guide
+# Shared Memory 0.4.0 operating guide
 
 Shared Memory now defaults to **direct editing in a shared Markdown folder**.
 Save notes in your normal editor, including offline. Run `sync` to capture the bytes
@@ -19,9 +19,9 @@ disposable trial. Python 3.11+ and the verified package are required; the local
 folder engine uses the standard library. The optional historical coordinator's
 server dependencies are not needed for folder mode.
 
-Use the exact release at [v0.3.0](https://github.com/Kian-hdr/shared-memory/releases/tag/v0.3.0)
+Use the exact release at [v0.4.0](https://github.com/Kian-hdr/shared-memory/releases/tag/v0.4.0)
 only when its assets are present. The expected executable is
-`shared-memory-0.3.0.pyz`, with external `SHA256SUMS`; an explicitly supplied reviewed
+`shared-memory-0.4.0.pyz`, with external `SHA256SUMS`; an explicitly supplied reviewed
 candidate is also usable. Internal package hashes do not independently authenticate
 the publisher. Compare the external SHA before executing a download:
 
@@ -73,6 +73,41 @@ provider and OS rights remain authoritative too. Omitting the flag on a later se
 does not silently widen a saved read-only binding. Requesting it for an existing
 writable binding is refused rather than silently changing or ignoring access intent.
 Creating a new project requires a writable editor.
+
+## Persistent memory layout in development builds
+
+For an entirely empty selected folder, current source builds seed:
+
+```text
+PROJECT/
+├── Raw/README.md
+├── Wiki/README.md
+├── Output/README.md
+├── AGENTS.md
+└── INDEX.md
+```
+
+`Raw/` is the source inbox, `Wiki/` is durable canonical knowledge, and `Output/`
+is the default for substantial generated deliverables. Agents read `AGENTS.md`,
+`INDEX.md` and relevant Wiki pages, then automatically maintain durable project
+state and decisions. The same knowledge structure applies across devices; private
+runtime baselines remain separate. The README notes keep the three directories
+portable through file synchronization and record their purpose.
+
+The seed notes use the existing initialization history and recovery path. Setup
+never overwrites existing notes or reorganizes populated folders, including ones
+containing only hidden files or empty directories. Join and resume reuse delivered
+history and user instructions. An existing-workspace structural migration is a
+separate explicitly requested task, requiring preserved relative hierarchy,
+recovery, attachment and link validation, and a migration log. `migrate-folder`
+changes historical workflow format; it does not reorganize knowledge folders.
+
+This layout is supplied by 0.4.0. Earlier 0.3.0 packages do not seed it.
+Use [automatic capture](AUTOMATIC-CAPTURE.md) to keep routine sync outside the model,
+or `sync PROJECT --brief` for concise manual capture. Untracked directory links are
+excluded without traversal; tracked-path and boundary links remain rejected.
+Untracked filenames rejected by Unicode/Windows portability rules stay untouched and
+are reported in skipped_paths plus warnings. They are not captured in shared history.
 
 ## What is shared
 

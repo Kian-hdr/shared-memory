@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0
+
+- Skip untracked symlink/reparse directories without weakening tracked-path boundaries.
+- Seed only empty new workspaces with Raw/Wiki/Output and concise routing instructions.
+- Add bounded `--brief` folder output and model-independent automatic capture setup.
+- Shorten setup and skill context; preserve native note editing when capture is unavailable.
+
+
 ## 0.3.0, direct-folder workflow
 
 - Ordinary note editing is the default. Local saves and captured change history no

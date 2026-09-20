@@ -179,6 +179,8 @@ def main(argv=None) -> int:
             metadata = data.get("metadata", {})
             if metadata.get("mode") in {"shared-folder", "git", "hybrid"}:
                 warnings.append(project.SHARED_WARNING)
+            if getattr(args, "brief", False):
+                data = folder_workflow.brief(data)
             emit(command, ok=True, code="ok", data=data, warnings=warnings)
             return 0
     except ProductError as exc:
