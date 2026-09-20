@@ -155,8 +155,8 @@ def capture_signature(config):
 
 
 def recent_full_capture(result):
-    # Both clocks bound idle reuse. A reboot or either clock moving backwards
-    # invalidates the cache rather than extending its lifetime.
+    # Both clocks bound idle reuse. Either clock moving backwards invalidates
+    # the cache rather than extending its lifetime.
     for key, now in (('synced_at', time.time()), ('full_sync_monotonic', time.monotonic())):
         stamp = result.get(key)
         if not isinstance(stamp, (int, float)) or not 0 <= now - stamp < 600:

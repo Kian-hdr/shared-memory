@@ -1,6 +1,7 @@
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -14,6 +15,7 @@ spec.loader.exec_module(module)
 
 
 class LauncherTests(unittest.TestCase):
+    @unittest.skipIf(os.name == "nt", "The installed command launcher is POSIX-only; Windows uses Python .pyz")
     def test_checksum_argv_and_full_diagnostics(self):
         with tempfile.TemporaryDirectory() as tmp:
             base=Path(tmp).resolve()
@@ -30,3 +32,10 @@ class LauncherTests(unittest.TestCase):
             result=run('sync')
             self.assertEqual(result.returncode,5)
             self.assertEqual(json.loads(result.stdout)['code'],'launcher_error')
+
+    @unittest.skipUnless(os.name == "nt", "Windows-specific installer rejection")
+    def test_windows_installer_reports_supported_route(self):
+        result = subprocess.run([sys.executable, str(script), '--runtime', 'unused.pyz',
+                                 '--sha256', '0'*64], capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('on Windows use Python with the verified .pyz directly', result.stderr)

@@ -86,15 +86,16 @@ class FolderTests(unittest.TestCase):
         with patch.object(module, 'atomic', interrupted), self.assertRaises(RuntimeError):
             Folder.initialize(root, state, 'seed', 'Person', 'Agent',
                               initial_files=seed, materialize_initial=True)
-        (root / 'AGENTS.md').write_text('Newer user instructions\n')
+        newer = b'Newer user instructions\r\n'
+        (root / 'AGENTS.md').write_bytes(newer)
         # A retry reads its original durable intent without needing the templates.
         resumed = Folder.initialize(root, state, 'seed', 'Person', 'Agent')
-        self.assertEqual((root / 'AGENTS.md').read_text(), 'Newer user instructions\n')
+        self.assertEqual((root / 'AGENTS.md').read_bytes(), newer)
         self.assertEqual((root / 'Wiki/README.md').read_text(), seed['Wiki/README.md'])
         events = resumed.history('AGENTS.md')['events']
         preserved = [e['changes'].get('AGENTS.md') for e in events]
         self.assertIn(seed['AGENTS.md'], preserved)
-        self.assertIn('Newer user instructions\n', preserved)
+        self.assertIn(newer.decode('utf-8'), preserved)
 
     def test_nextcloud_binding_and_unverified_delivery(self):
         one = self.create(provider='nextcloud')
