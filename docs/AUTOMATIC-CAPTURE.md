@@ -64,8 +64,8 @@ new history entries can cause one extra full pass before the workspace settles.
 
 A partial result, failure, timeout, changed configuration or missing fingerprint
 requires another full sync. Even an unchanged workspace gets a full sync after
-ten minutes, measured against both wall and monotonic clocks. A reboot or backwards
-clock change forces a fresh full capture. This bounds the cache's lifetime and
+ten minutes, measured against both wall and monotonic clocks. A backwards change in either
+clock forces a fresh full capture. This bounds the cache's lifetime and
 checks private baseline/event state that the workspace scan does not cover.
 
 Metadata is an idle-work hint, not proof of unchanged content against deliberate
