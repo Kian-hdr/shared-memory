@@ -1,48 +1,53 @@
 # Shared Memory artwork
 
-Shared folio: three overlapping pages connected by one continuous line. The standard
-and dark appearances share the same geometry. The repository README selects the dark
-variant when the viewer prefers a dark color scheme.
+Neutral silver and graphite pages connected by one continuous line. The complete
+standard and dark icons are exported by Apple's Icon Composer for macOS. The
+background, mask and edge treatment come from the native renderer, not a manually
+drawn tile. The README selects the PNG matching the viewer's preferred color scheme.
 
 | Asset | Standard / light background | Dark appearance / background |
 |---|---|---|
-| Icon vector | [SVG](shared-memory.svg) | [SVG](shared-memory-dark.svg) |
-| Icon, 1024px | [PNG](shared-memory.png) | [PNG](shared-memory-dark.png) |
+| Native icon, 1024px | [PNG](shared-memory.png) | [PNG](shared-memory-dark.png) |
 | macOS icon container | [ICNS](shared-memory.icns) | [ICNS](shared-memory-dark.icns) |
 | Transparent symbol | [Dark ink](shared-memory-mark-dark.svg) | [Light ink](shared-memory-mark-light.svg) |
 | Publication wordmark | [Dark ink](shared-memory-wordmark-dark.svg) | [Light ink](shared-memory-wordmark-light.svg) |
 
-[Appearance preview](light-dark-preview.png). PNG icon exports are available at
-16, 24, 32, 48, 64, 128, 256, 512 and 1024 pixels. Use the full-colour icon at 32px
-or larger when the connecting line matters; internal detail softens at 16px.
-Wordmark lettering is outlined, so SVG use needs no font installation. Preserve
-proportions and leave surrounding whitespace at least the height of the capital S.
+[Native Icon Composer source](SharedMemory.icon/icon.json) ·
+[Appearance preview](light-dark-preview.png).
+PNG exports include 16, 24, 32, 48, 64, 128, 256, 512 and 1024 pixels. Internal detail
+softens at 16px. Wordmark lettering is outlined and needs no installed font.
 
-These are macOS-style documentation and folder assets, with a rounded tile baked
-into the artwork. Shared Memory does not include a native macOS application or
-an Icon Composer project. The two ICNS files are explicit alternatives; they do
-not automatically switch a Finder folder's icon when macOS changes appearance.
+`shared-memory.svg` and `shared-memory-dark.svg` are compatibility copies of the
+unmasked foreground vector, identical across appearances. They do not reproduce
+the native background. Use the PNG exports for the complete icon or open
+`SharedMemory.icon` in Icon Composer for native editing and appearance previews.
 
-## Regenerate icon exports
+The native source follows Apple's layered icon workflow. The checked-in exports
+were rendered with Icon Composer 27.0 (129), design generation 27, macOS Default
+and Dark. These are standalone artwork assets, not a shipped macOS application.
+The ICNS files are explicit alternatives and do not switch Finder appearance
+automatically. No app installation or runtime appearance-switching test is claimed.
 
-Install CairoSVG and Pillow in an isolated development environment. CairoSVG also
-requires the Cairo native library (on macOS, available through Homebrew). Then run:
+## Regenerate native exports
+
+On a Mac with Icon Composer 27 and Pillow in your development Python environment:
 
 ```sh
 python scripts/render_icon.py --output /path/to/a/new/icon-output
 ```
 
-The renderer reads the checked-in SVG sources and writes both appearances only to
-a new directory. Review its output before replacing assets. These dependencies are
-for artwork development only; they are not Shared Memory runtime requirements.
+The script uses Icon Composer bundled with Xcode. Set `--ictool` for another
+installation; `xcrun ictool` may resolve to a different, incompatible executable.
+It writes both appearances to a fresh directory. These are artwork development
+requirements only, not Shared Memory runtime dependencies.
 
 ## Provenance
 
-Original vector refinement of this repository's shared-pages artwork, distributed
-under the repository [MIT license](../LICENSE). The previous icon remains in Git
-history, including the immutable [v0.4.0 assets](https://github.com/Kian-hdr/shared-memory/tree/v0.4.0/assets).
+Original refinement of this repository's MIT shared-pages artwork. Previous color
+versions remain in Git history. Wordmark lettering uses outlined Manrope SemiBold
+from [Google Fonts](https://github.com/google/fonts/tree/main/ofl/manrope), licensed
+under the [SIL Open Font License 1.1](Manrope-OFL.txt). No font binaries, Apple icon
+artwork or SF fonts are redistributed. No trademark clearance is claimed.
 
-Wordmark lettering uses outlined Manrope SemiBold from
-[Google Fonts](https://github.com/google/fonts/tree/main/ofl/manrope), licensed under
-the [SIL Open Font License 1.1](Manrope-OFL.txt). No font binaries, Apple artwork,
-SF fonts or stock icons are redistributed. No trademark clearance is claimed.
+References: [Apple app icons](https://developer.apple.com/design/human-interface-guidelines/app-icons)
+and [Icon Composer workflow](https://developer.apple.com/documentation/xcode/creating-your-app-icon-using-icon-composer).

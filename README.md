@@ -1,8 +1,8 @@
 # Shared Memory
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/shared-memory-dark.svg">
-  <img src="assets/shared-memory.svg" width="96" height="96" alt="Shared Memory icon: connected pages">
+  <source media="(prefers-color-scheme: dark)" srcset="assets/shared-memory-dark.png">
+  <img src="assets/shared-memory.png" width="96" height="96" alt="Shared Memory icon: connected pages">
 </picture>
 
 [Icons and publication wordmarks](assets/README.md)

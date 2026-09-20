@@ -1,0 +1,19 @@
+{
+  "fill": {
+    "automatic-gradient": "extended-srgb:1.00000,1.00000,1.00000,1.00000"
+  },
+  "groups": [
+    {
+      "name": "Shared folio",
+      "layers": [
+        {
+          "image-name": "foreground.svg",
+          "name": "Connected pages"
+        }
+      ]
+    }
+  ],
+  "supported-platforms": {
+    "squares": "shared"
+  }
+}
