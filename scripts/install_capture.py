@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import plistlib
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -84,6 +85,85 @@ def command(config):
     return [config['python'], config['runtime'], 'sync', config['project'], '--state-dir', config['state'], '--brief']
 
 
+
+def fingerprint(project):
+    """Cheap metadata hint; any incomplete scan disables the idle optimization.
+
+    Open each directory relative to its held parent descriptor with O_NOFOLLOW.
+    Include portable history and ignored paths conservatively; never follow links.
+    This is an idle check, not a replacement for runtime content validation.
+    """
+    if not hasattr(os, 'O_NOFOLLOW') or os.scandir not in os.supports_fd:
+        return None
+    digest = hashlib.sha256(b'shared-memory-capture-stat-v1\0')
+    entries = 0
+
+    def record(relative, metadata):
+        nonlocal entries
+        entries += 1
+        digest.update(json.dumps((relative, metadata.st_dev, metadata.st_ino,
+                      metadata.st_mode, metadata.st_size, metadata.st_mtime_ns,
+                      metadata.st_ctime_ns), ensure_ascii=True).encode())
+        digest.update(b'\0')
+
+    def scan(descriptor, relative):
+        record(relative, os.fstat(descriptor))
+        with os.scandir(descriptor) as iterator:
+            children = sorted(iterator, key=lambda item: item.name)
+        for child in children:
+            path = relative + '/' + child.name
+            metadata = child.stat(follow_symlinks=False)
+            if stat.S_ISDIR(metadata.st_mode) and not getattr(metadata, 'st_file_attributes', 0) & 0x400:
+                nested = os.open(child.name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=descriptor)
+                try:
+                    scan(nested, path)
+                finally:
+                    os.close(nested)
+            else:
+                record(path, metadata)
+
+    try:
+        root = os.open(project, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        try:
+            scan(root, '')
+        finally:
+            os.close(root)
+    except (OSError, RecursionError):
+        return None
+    return {'version': 1, 'sha256': digest.hexdigest(), 'entries': entries}
+
+
+def cached_result(capture):
+    try:
+        path = physical(capture / 'last-result.json')
+        if path.stat().st_size > 32768:
+            return None
+        result = json.loads(path.read_text())
+        return result if isinstance(result, dict) else None
+    except (OSError, ValueError):
+        return None
+
+
+def capture_signature(config):
+    state = Path(config['state'])
+    binding = state / ('folder/folder.json' if (state / 'connection.json').exists() else 'folder.json')
+    digest = hashlib.sha256(json.dumps(config, sort_keys=True).encode())
+    digest.update(physical(binding).read_bytes())
+    # Updating the installed runner also forces a fresh full capture.
+    digest.update(Path(__file__).read_bytes())
+    return digest.hexdigest()
+
+
+def recent_full_capture(result):
+    # Both clocks bound idle reuse. A reboot or either clock moving backwards
+    # invalidates the cache rather than extending its lifetime.
+    for key, now in (('synced_at', time.time()), ('full_sync_monotonic', time.monotonic())):
+        stamp = result.get(key)
+        if not isinstance(stamp, (int, float)) or not 0 <= now - stamp < 600:
+            return False
+    return True
+
+
 def run_once(config):
     if fcntl is None:
         raise ValueError('Automatic capture requires POSIX file locking; use the ordinary sync command on this platform.')
@@ -97,10 +177,24 @@ def run_once(config):
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             return 75
-        result = {'checked_at': time.time(), 'ok': False}
+        started = time.perf_counter()
+        result = {'checked_at': time.time(), 'ok': False, 'mode': 'sync'}
         code = 1
         try:
             validate(config)
+            signature = capture_signature(config)
+            before = fingerprint(config['project'])
+            previous = cached_result(capture)
+            if (before is not None and previous and previous.get('ok') is True
+                    and previous.get('readiness') == 'ready'
+                    and previous.get('capture_signature') == signature
+                    and previous.get('pre_sync_fingerprint') == before
+                    and recent_full_capture(previous)):
+                result = {**previous, 'checked_at': time.time(), 'unchanged': True,
+                          'mode': 'unchanged', 'duration_seconds': round(time.perf_counter() - started, 6)}
+                atomic(capture / 'last-result.json', json.dumps(result, indent=2).encode())
+                return 0
+            result['unchanged'] = False
             # Output can contain private paths. Keep only the final bounded result,
             # never append forever or emit it into launchd's system log.
             completed = subprocess.run(command(config), capture_output=True, timeout=300)
@@ -127,8 +221,17 @@ def run_once(config):
             result['ok'] = False
             code = code or 1
             result['error'] = str(error)[-4096:]
+        if result['ok'] and result.get('readiness') == 'ready':
+            result['synced_at'] = time.time()
+            result['full_sync_monotonic'] = time.monotonic()
+            result['capture_signature'] = signature
+            # Only the PRE-sync snapshot is cached. A concurrent edit, or a new
+            # history event written by sync itself, forces a subsequent full run.
+            if before is not None:
+                result['pre_sync_fingerprint'] = before
         if result['ok'] and result.get('attention_required'):
             code = 2
+        result['duration_seconds'] = round(time.perf_counter() - started, 6)
         atomic(capture / 'last-result.json', json.dumps(result, indent=2).encode())
         return code
 

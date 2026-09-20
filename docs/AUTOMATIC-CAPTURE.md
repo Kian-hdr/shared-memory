@@ -47,6 +47,34 @@ Previous changed configuration/runner/plist versions are retained in that privat
 directory. Repeating installation uses the same label, rather than creating a
 second job. History and the underlying private device state remain untouched.
 
+## Avoid repeated idle work
+
+Each scheduled check first verifies the runtime checksum and writable binding,
+then scans file metadata under the selected workspace. The fingerprint includes
+relative paths, inode/device, type, size, nanosecond modification/change times,
+and all portable history entries. Directory descriptors are opened without
+following symlinks; an incomplete scan disables this optimization.
+
+If the fingerprint matches the **pre-sync** fingerprint of the latest successful,
+ready capture, and its configuration/binding/runner are unchanged, the check skips
+the full runtime. It refreshes `checked_at`, records `mode: unchanged`, and preserves
+`synced_at` from the actual full capture. Storing only the pre-sync fingerprint
+ensures an edit made during sync is checked again on the next pass. Sync's own
+new history entries can cause one extra full pass before the workspace settles.
+
+A partial result, failure, timeout, changed configuration or missing fingerprint
+requires another full sync. Even an unchanged workspace gets a full sync after
+ten minutes, measured against both wall and monotonic clocks. A reboot or backwards
+clock change forces a fresh full capture. This bounds the cache's lifetime and
+checks private baseline/event state that the workspace scan does not cover.
+
+Metadata is an idle-work hint, not proof of unchanged content against deliberate
+metadata manipulation or a broken filesystem. The periodic full runtime remains
+the authority for history validation. Run the normal `sync` command for an immediate
+full check. `duration_seconds` measures each capture invocation; `mode` distinguishes
+full `sync` from `unchanged` checks so observed performance is not confused with
+the scheduling interval. No model is involved in either mode.
+
 ## Inspect, repair and stop
 
 Run `python3 scripts/install_capture.py '/absolute/selected workspace' --status` to inspect whether launchd has loaded the job

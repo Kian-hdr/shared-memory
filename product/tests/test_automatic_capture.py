@@ -172,3 +172,114 @@ class CaptureTests(unittest.TestCase):
                 (directory / 'last-result.json').write_text(json.dumps(dict(ok=ok, readiness=readiness, checked_at=checked_at)))
                 with patch.object(sys, 'argv', [str(SCRIPT), str(self.project), '--status']), patch.object(sys, 'platform', 'darwin'), patch.object(capture.os, 'getuid', return_value=42, create=True), patch.object(capture, 'launchctl', return_value=CompletedProcess([], 0)), contextlib.redirect_stdout(io.StringIO()):
                     self.assertEqual(capture.main(), expected)
+
+    def successful_runtime(self):
+        from subprocess import CompletedProcess
+        return CompletedProcess([], 0, b'{"ok":true,"data":{"readiness":"ready"}}', b'')
+
+    @unittest.skipUnless(capture.fcntl is not None, 'POSIX capture runner')
+    def test_idle_scan_skips_runtime_but_validates_runtime_checksum(self):
+        with patch.object(capture.subprocess, 'run', return_value=self.successful_runtime()) as run:
+            self.assertEqual(capture.run_once(self.config), 0)
+            self.assertEqual(capture.run_once(self.config), 0)
+            self.assertEqual(run.call_count, 1)
+            result = json.loads((self.logs / 'last-result.json').read_text())
+            self.assertTrue(result['unchanged'])
+            self.assertIn('synced_at', result)
+            self.runtime.write_text('raise RuntimeError("must not run")')
+            self.assertNotEqual(capture.run_once(self.config), 0)
+            self.assertEqual(run.call_count, 1)
+
+    @unittest.skipUnless(capture.fcntl is not None, 'POSIX capture runner')
+    def test_provider_history_arrival_triggers_capture(self):
+        history = self.project / '.shared-memory/events'
+        history.mkdir(parents=True)
+        with patch.object(capture.subprocess, 'run', return_value=self.successful_runtime()) as run:
+            self.assertEqual(capture.run_once(self.config), 0)
+            (history / 'provider-event.json').write_text('fixture')
+            self.assertEqual(capture.run_once(self.config), 0)
+            self.assertEqual(run.call_count, 2)
+
+    @unittest.skipUnless(capture.fcntl is not None, 'POSIX capture runner')
+    def test_same_size_edit_even_with_restored_mtime_triggers_capture(self):
+        import os
+        note = self.project / 'Note.md'
+        note.write_text('before')
+        before = note.stat()
+        with patch.object(capture.subprocess, 'run', return_value=self.successful_runtime()) as run:
+            self.assertEqual(capture.run_once(self.config), 0)
+            note.write_text('after!')
+            os.utime(note, ns=(before.st_atime_ns, before.st_mtime_ns))
+            self.assertEqual(capture.run_once(self.config), 0)
+            self.assertEqual(run.call_count, 2)
+
+    @unittest.skipUnless(capture.fcntl is not None, 'POSIX capture runner')
+    def test_concurrent_edit_during_sync_is_not_hidden_by_post_sync_fingerprint(self):
+        note = self.project / 'Note.md'
+        note.write_text('before')
+        def sync_and_edit(*args, **kwargs):
+            note.write_text('after')
+            return self.successful_runtime()
+        with patch.object(capture.subprocess, 'run', side_effect=sync_and_edit) as run:
+            self.assertEqual(capture.run_once(self.config), 0)
+        with patch.object(capture.subprocess, 'run', return_value=self.successful_runtime()) as run:
+            self.assertEqual(capture.run_once(self.config), 0)
+            self.assertEqual(run.call_count, 1)
+            self.assertEqual(capture.run_once(self.config), 0)
+            self.assertEqual(run.call_count, 1)
+
+    @unittest.skipUnless(capture.fcntl is not None, 'POSIX capture runner')
+    def test_failure_and_partial_and_timeout_do_not_cache_success(self):
+        from subprocess import CompletedProcess, TimeoutExpired
+        failures = [CompletedProcess([], 1, b'{"ok":false}', b''), CompletedProcess([], 0, b'{"ok":true,"data":{"readiness":"partial"}}', b''), TimeoutExpired([], 300)]
+        for failure in failures:
+            with self.subTest(failure=failure):
+                with patch.object(capture.subprocess, 'run', side_effect=[failure, self.successful_runtime()]) as run:
+                    with patch.object(capture, 'cached_result', return_value=None):
+                        self.assertNotEqual(capture.run_once(self.config), 0)
+                    self.assertEqual(capture.run_once(self.config), 0)
+                    self.assertEqual(run.call_count, 2)
+
+    @unittest.skipUnless(capture.fcntl is not None, 'POSIX capture runner')
+    def test_fingerprint_does_not_follow_directory_links(self):
+        outside = self.base / 'Outside'
+        outside.mkdir()
+        target = outside / 'not-part-of-project.md'
+        target.write_text('before')
+        (self.project / 'linked-directory').symlink_to(outside, target_is_directory=True)
+        before = capture.fingerprint(str(self.project))
+        self.assertIsNotNone(before)
+        target.write_text('changed external content')
+        self.assertEqual(before, capture.fingerprint(str(self.project)))
+
+    @unittest.skipUnless(capture.fcntl is not None, 'POSIX capture runner')
+    def test_incomplete_scan_or_config_change_cannot_skip(self):
+        with patch.object(capture.subprocess, 'run', return_value=self.successful_runtime()) as run:
+            self.assertEqual(capture.run_once(self.config), 0)
+            self.config['interval'] = 30
+            self.assertEqual(capture.run_once(self.config), 0)
+            with patch.object(capture, 'fingerprint', return_value=None):
+                self.assertEqual(capture.run_once(self.config), 0)
+                self.assertEqual(capture.run_once(self.config), 0)
+            self.assertEqual(run.call_count, 4)
+
+    @unittest.skipUnless(capture.fcntl is not None, 'POSIX capture runner')
+    def test_idle_cache_forces_full_capture_after_ten_minutes_or_clock_reset(self):
+        import time
+        with patch.object(capture.subprocess, 'run', return_value=self.successful_runtime()) as run:
+            self.assertEqual(capture.run_once(self.config), 0)
+            result_path = self.logs / 'last-result.json'
+            for key, stamp in (('synced_at', time.time() - 601), ('full_sync_monotonic', time.monotonic() + 10)):
+                result = json.loads(result_path.read_text())
+                result[key] = stamp
+                result_path.write_text(json.dumps(result))
+                self.assertEqual(capture.run_once(self.config), 0)
+            self.assertEqual(run.call_count, 3)
+            result = json.loads(result_path.read_text())
+            self.assertEqual(result['mode'], 'sync')
+            self.assertGreaterEqual(result['duration_seconds'], 0)
+            self.assertEqual(capture.run_once(self.config), 0)
+            result = json.loads(result_path.read_text())
+            self.assertEqual(result['mode'], 'unchanged')
+            self.assertGreaterEqual(result['duration_seconds'], 0)
+            self.assertEqual(run.call_count, 3)
