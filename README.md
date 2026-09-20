@@ -1,9 +1,11 @@
 # Shared Memory
 
+<p align="center">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/shared-memory-dark.png">
   <img src="assets/shared-memory.png" width="96" height="96" alt="Shared Memory icon: connected pages">
 </picture>
+</p>
 
 [Icons and publication wordmarks](assets/README.md)
 
