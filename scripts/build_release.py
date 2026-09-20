@@ -113,8 +113,8 @@ def release(output: Path, version: str) -> dict:
                    for name, content in sources.items() if name.startswith(skill_prefix)}
     skill_files["LICENSE"] = sources["LICENSE"]
     archive(output / f"shared-memory-skill-{version}.zip", skill_files)
-    icons = {name: sources["assets/" + name]
-             for name in ("shared-memory.svg", "shared-memory.png", "shared-memory.icns", "README.md")}
+    icons = {name.removeprefix("assets/"): content
+             for name, content in sources.items() if name.startswith("assets/")}
     icons["LICENSE"] = sources["LICENSE"]
     archive(output / f"shared-memory-icons-{version}.zip", icons)
     manifest = {
